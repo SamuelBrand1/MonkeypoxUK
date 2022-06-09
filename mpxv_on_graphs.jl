@@ -1,35 +1,152 @@
-using Graphs,MetaGraphs,Distributions,Plots #,GraphRecipes
+using Graphs,MetaGraphs,Distributions,Plots# ,GraphRecipes
 using GLMakie, GraphMakie
+using SparseArrays,LinearAlgebra
 using GraphMakie.NetworkLayout,RCall
+using CSV, DataFrames
 
 ## Network building parameters
 
 prop_lgb = 0.026
-n_lgb = 1000
+n_lgb = 100
+@rput n_lgb
+
+## People
+infectivity_profile=[0 0 0 0.2 0.2 0.2 0.3 0.5 0.8 1 1 1 1 1 1 1 1 1 0.8 0.5 0][:]
+
+Base.@kwdef mutable struct Person
+    age::Int64
+    disease_status::Char = 'S'
+    days_since_inf::Int64 = 0
+    household_id::Int64 = -1 #-1 means unassigned
+    work_id::Int64 = -1 
+    msm::Bool = true
+end
+
+natsal_data = CSV.File("NATSAL3_MSM_header.csv") |> DataFrame
+p_choose = normalize(natsal_data.total_wt,1)
+hh_distrib = normalize!([7452,9936,4416,4140,1104,552].*1e3,1)
+
+population = [Person(age = natsal_data.dage[rand(Categorical(p_choose))]) for i = 1:n_lgb]
+
 
 ## sexual contact matrix from simdynet
 R"""
     library(simdynet)
-    s <- sim_static_sn(N=100,gamma = 1.8) 
+    Sys.setenv('R_MAX_VSIZE'=320000000000)
+    s <- sim_static_sn(N=n_lgb,gamma = 1.8)
+
 """
 sex_cnt_net = @rget s
-cnt_mat = sex_cnt_net[:res] .+ sex_cnt_net[:res]'
-G_sexct = Graph(cnt_mat)
-graphplot(G_sexct)
+cnt_mat = sparse(sex_cnt_net[:res] .+ sex_cnt_net[:res]')
+G = Graph(cnt_mat)
+cnt_G = MetaGraph(G)
+# graphplot(G_sexct)
+#Set the base graph as sexual contacts
+for e in edges(cnt_G)
+    set_prop!(cnt_G,e,:type,:sexual)
+end
+## Generate household contacts
+function assign_household_ids!(population,G,prob_ingroup = prop_lgb)
+    curr_hh_id = 1
+    for person in population
+        if person.household_id == -1 && person.msm
+            n_hh = rand(Categorical(hh_distrib)) - 1 #Number of people in household
+            new_people = rand(Binomial(n_hh, 1 - prob_ingroup)) # New non-lgb people
+            add_vertices!(G,new_people)
+            curr_people = n_hh - new_people #Household links to people already in population
+            person.household_id = curr_hh_id
+            for np in 1:new_people
+                sampleage = natsal_data.dage[rand(Categorical(p_choose))]
+                push!(population,Person(age = sampleage,household_id = curr_hh_id,msm = false))#New person in current household
+            end
+            for np in 1:curr_people
+                f = findall([person.household_id == -1 for person in population]) #Index currently unassigned people in population
+                choose = rand(f) #Select an unassigned person already in the population
+                population[choose].household_id = curr_hh_id
+            end
+            curr_hh_id +=1 
+        end
+    end
+    return nothing
+end
 
-##
-@time G = stochastic_block_model(50.0, 1.0, fill(10000,10))
-# function plot_this(G)
-#     graphplot(G,curves = false)
-# end
-gay_nightclubs_london = 51
-prop_lgb_london = 0.026
-N_london = 8.9e6
-G = watts_strogatz(100,7,0.9)
-graphplot(G)
+function assign_work_ids!(population,G,prob_ingroup = prop_lgb,mean_wk_cnts = 7)
+    curr_wk_id = 1
+    for person in population
+        if person.work_id == -1 && person.msm
+            n_wk = rand(Poisson(mean_wk_cnts)) #Number of people in workplace
+            new_people = rand(Binomial(n_wk, 1 - prob_ingroup)) # New non-lgb people
+            add_vertices!(G,new_people)
+            curr_people = n_wk - new_people #Household links to people already in population
+            person.work_id = curr_wk_id
+            for np in 1:new_people
+                sampleage = natsal_data.dage[rand(Categorical(p_choose))]
+                push!(population,Person(age = sampleage,work_id = curr_wk_id,msm = false))#New person in current workplace
+            end
+            for np in 1:curr_people
+                f = findall([person.work_id == -1 for person in population]) #Index currently unassigned people in population
+                choose = rand(f) #Select an unassigned person already in the population
+                population[choose].work_id = curr_wk_id
+            end
+            curr_wk_id +=1 
+        end
+    end
+    return nothing
+end
 
-# @time plot_this(G)
+function add_household_contacts!(population,G)
+    for (i,person) in enumerate(population)
+        hh_id = person.household_id
+        for j in (i+1):length(population)
+            population[j].household_id == hh_id && add_edge!(G,i,j,:type,:hh)
+        end
+    end
+    return nothing
+end
 
+function add_work_contacts!(population,G)
+    for (i,person) in enumerate(population)
+        wk_id = person.work_id
+        for j in (i+1):length(population)
+            population[j].work_id == wk_id && add_edge!(G,i,j,:type,:work)
+        end
+    end
+    return nothing
+end
+population
+cnt_G
+assign_household_ids!(population,cnt_G)
+population
+cnt_G
+assign_work_ids!(population,cnt_G)
+population
+cnt_G
+add_household_contacts!(population,cnt_G)
+add_work_contacts!(population,cnt_G)
+
+@time graphplot(cnt_G)
+
+## Add work contacts
+
+g = watts_strogatz(1000,7,0.)
+@time graphplot(g,title = "work")
+
+
+
+
+
+# @time G = stochastic_block_model(50.0, 1.0, fill(10000,10))
+# # function plot_this(G)
+# #     graphplot(G,curves = false)
+# # end
+# gay_nightclubs_london = 51
+# prop_lgb_london = 0.026
+# N_london = 8.9e6
+# G = watts_strogatz(100,7,0.9)
 # graphplot(G)
-degs = length.(G.fadjlist)
-histogram(degs)
+
+# # @time plot_this(G)
+
+# # graphplot(G)
+# degs = length.(G.fadjlist)
+# histogram(degs)
