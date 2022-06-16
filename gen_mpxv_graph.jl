@@ -77,7 +77,7 @@ function infect_node!(G,inf_node,σ,ϕ;α = 0.8,time_period = 365.25,max_size = 
     end
 end
 
-function infections!(G,infectivity_profile,σ,ϕ;α = 0.8,time_period = 365.25)
+function infections!(G,infectivity_profile,σ,ϕ;α = 0.8,time_period = 365.25,max_size = 100_000)
     for i in get_prop(G,:inf_nodes)
         for j in neighbors(G,i)
             τ = get_prop(G,i,j,:time_left) - 1.0 #Decrease time to event
