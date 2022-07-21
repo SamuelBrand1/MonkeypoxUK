@@ -90,10 +90,12 @@ function infections!(G,infectivity_profile,σ,ϕ;α = 0.8,time_period = 365.25,m
     end
 end
 
+## Basic parameters
 
 baseline_infectivity_profile=[0 0 0 0.2 0.2 0.2 0.3 0.5 0.8 1 1 1 1 1 1 1 1 1 0.8 0.5 0][:]
-
 α₀ = 0.8
+
+
 ## Create basic graph
 G = MetaGraph()
 set_prop!(G,:inf_nodes,Int64[])
@@ -110,3 +112,7 @@ end
 infections!(G,0.1.*baseline_infectivity_profile,1.0,0.5;α = 0.8,time_period = 365.25)
 infectious_periods!(G)
 length(get_prop(G,:inf_nodes))
+
+##
+G = erdos_renyi(1000,0.1)
+@time graph_dist = floyd_warshall_shortest_paths(G)
