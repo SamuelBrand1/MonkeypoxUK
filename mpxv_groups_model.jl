@@ -84,7 +84,7 @@ function setup_initial_state(N_pop,N_msm,α_choose,p_detect,γ_eff,ps;n_states =
     #add infecteds so that expected detections on week 1 are 1
     choose_clique = rand(Categorical(normalize(N_clique,1)))
     n_infs = 8*ceil(Int64,1/(p_detect*(1-exp(-γ_eff))))
-    u0_msm[2:9,:,choose_clique] .= map(μ -> rand(Poisson(μ)), fill(n_infs/(3.5*8*length(ps)),8,length(ps)))
+    u0_msm[2:9,:,choose_clique] .= map(μ -> rand(Poisson(μ)), fill(n_infs/(8*length(ps)),8,length(ps)))
     #
     u0_other[1] = N_pop
     N_grp_msm = u0_msm[1,:,:]
@@ -192,7 +192,7 @@ function mpx_sim_function(params, constants, wkly_cases)
     #Get constant data
     N_total,N_msm,ps,ms,ingroup,ts,α_incubation = constants
     #Get parameters and make transformations
-    α_choose,p_detect,mean_inf_period,p_trans,R0_other,M = params
+    α_choose,p_detect,mean_inf_period,p_trans,R0_other = params
     γ_eff = 1/mean_inf_period #get recovery rate
     # M = (1/ρ) + 1 #effective sample size for Beta-Binomial
     #Generate random population structure
@@ -226,8 +226,8 @@ function mpx_sim_function(params, constants, wkly_cases)
             step!(mpx_init,7) 
             new_recs = [sum(mpx_init.u.x[1][10,:,:]),mpx_init.u.x[2][10]]
             detected_cases[wk_num] = (sum(new_recs) - sum(old_recs))*p_detect
-            actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1],p_detect*M,(1-p_detect)*M)),rand(BetaBinomial(new_recs[2] - old_recs[2],p_detect*M,(1-p_detect)*M))]
-            L1_rel_err += sum(abs,actual_obs .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
+            # actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1],p_detect*M,(1-p_detect)*M)),rand(BetaBinomial(new_recs[2] - old_recs[2],p_detect*M,(1-p_detect)*M))]
+            L1_rel_err += sum(abs,detected_cases[wk_num] .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
             wk_num += 1
             old_recs = new_recs
         end
@@ -253,14 +253,14 @@ scatter!(mpxv_wkly)
 ## Priors
 
 # α_choose,p_detect,1/γ_eff,p_trans,R0_other,ρ
-prior_vect = [Gamma(2,1/2),Beta(5,5),Gamma(3,7/3),Beta(10,90),LogNormal(0,0.5),Gamma(2,50/2)]
+prior_vect = [Gamma(2,1/2),Beta(5,5),Gamma(3,7/3),Beta(10,90),LogNormal(0,0.5)]#,Gamma(2,50/2)]
 
 
 ##run ABC
 
 setup = ABCSMC(mpx_sim_function, #simulation function
-  6, # number of parameters
-  0.1, #target ϵ
+  5, # number of parameters
+  0.4, #target ϵ
   Prior(prior_vect); #Prior for each of the parameters
   ϵ1 = 100.0,
   convergence = 0.05,
@@ -269,7 +269,7 @@ setup = ABCSMC(mpx_sim_function, #simulation function
   constants = constants,
   maxiterations = 10^9)
 
-smc = runabc(setup, mpxv_wkly, verbose = true, progress = true, parallel = true)
+smc = runabc(setup, mpxv_wkly, verbose = true, progress = true)
 
 ##
 @save("results.jld2",smc)
