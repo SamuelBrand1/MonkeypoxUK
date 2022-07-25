@@ -74,24 +74,25 @@ mean_daily_cnts = map(x -> (α_scaling / (α_scaling - 1)) * (x[1]^(1 - α_scali
 
 ##
 
-function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps; n_states=10, n_cliques=50)
+function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps,init_scale; n_states=10, n_cliques=50)
     u0_msm = zeros(Int64, n_states, length(ps), n_cliques)
     u0_other = zeros(Int64, n_states)
     N_clique = rand(DirichletMultinomial(N_msm, α_choose * ones(n_cliques)))
     for k = 1:n_cliques
         u0_msm[1, :, k] .= rand(Multinomial(N_clique[k], ps))
     end
-    #add infecteds so that expected detections on week 1 are 1
-    choose_clique = rand(Categorical(normalize(N_clique, 1)))
-    n_infs = 8 * ceil(Int64, 1 / (p_detect * (1 - exp(-γ_eff))))
-    u0_msm[2:9, :, choose_clique] .= map(μ -> rand(Poisson(μ)), fill(n_infs / (3.5 * 8 * length(ps)), 8, length(ps)))
-    #
+    #Add infecteds so that expected detections on week 1 are 1
+    choose_clique = rand(Categorical(normalize(N_clique,1)))
+    av_infs = 8*init_scale/(p_detect*(1-exp(-γ_eff))) #Set av number of infecteds across 8 categories of incubation and infectious rescaled by daily probability of detection if infectious
+    u0_msm[2:9,:,choose_clique] .= map(μ -> rand(Poisson(μ)), fill(av_infs/(8*length(ps)),8,length(ps)))
+    u0_msm = u0_msm[:,:,N_clique .>0] #Reduce group size
+    #Set up non MSM population
     u0_other[1] = N_pop
     N_grp_msm = u0_msm[1, :, :]
-    return u0_msm, u0_other, N_clique, N_grp_msm
+    return u0_msm, u0_other, N_clique[N_clique .>0], N_grp_msm
 end
 
-@time u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_uk, N_msm, 0.1, 0.5, 1 / 7, ps)
+@time u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_uk, N_msm, 0.0011, 0.5, 1 / 7, ps,2.0)
 
 function setup_transmission_matrix(ms, ps, N_clique; ingroup=0.99)
     n_cliques = length(N_clique)
@@ -115,7 +116,7 @@ end
 @time Λ, B = setup_transmission_matrix(mean_daily_cnts, ps, N_clique; ingroup=0.99)
 
 
-
+##
 
 function f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
     p_trans, R0_other, γ_eff, α_incubation = p
@@ -132,10 +133,13 @@ function f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
 
     #force of infection
     total_I = I_other + sum(I)
-    λ = ((N_msm / N_total) * γ_eff * R0_other * total_I .+ p_trans .* Λ * I * B) ./ (N_grp_msm .+ 1e-5)
+    λ = (((N_msm / N_total) * γ_eff * R0_other * total_I) .+( p_trans .* (Λ * I * B))) ./ (N_grp_msm .+ 10)
     λ_other = γ_eff * R0_other * total_I / N_total
-
+    if any(λ .< 0)
+        print("Neg inf rate")
+    end
     #number of events
+    try
     num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-λ))#infections among MSM
     num_incs = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E)#incubation among MSM
     num_recs = map(n -> rand(Binomial(n, 1 - exp(-γ_eff))), I)#recovery among MSM
@@ -161,7 +165,9 @@ function f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
     du.x[1][10, :, :] .+= num_recs
     du.x[2][9] -= num_recs_other
     du.x[2][10] += num_recs_other
-
+    catch
+        print(I)
+    end
     return nothing
 end
 
@@ -174,104 +180,93 @@ du_mpx.x[2]
 
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
 
-prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_uk),
-    u_mpx, (ts[1], ts[end]), [0.1, 0.9, 1 / 7, 0.8])
-
-mpx_init = init(prob, FunctionMap())
-step!(mpx_init, 7)
-
-@time sol = solve(prob, FunctionMap(), saveat=7)
-Rs = [sum(u.x[1][10, :, :]) + u.x[2][end] for u in sol.u]
 
 
 ## Set up for ABC
+
 ingroup = 0.99
-constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, 0.8]
+n_cliques = 50
+constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, 0.8,n_cliques]
 
 function mpx_sim_function(params, constants, wkly_cases)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation = constants
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation,n_cliques = constants
     #Get parameters and make transformations
-    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M = params
+    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale = params
     γ_eff = 1 / mean_inf_period #get recovery rate
     # M = (1/ρ) + 1 #effective sample size for Beta-Binomial
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale;n_cliques = n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
     #Simulate and track error
     L1_rel_err = 0.0
-
     total_cases = sum(wkly_cases[3:end-1])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-        u_mpx, (ts[1], ts[end]),
-        [p_trans, R0_other, γ_eff, α_incubation])
+                            u_mpx, (ts[1], ts[end]),
+                            [p_trans, R0_other, γ_eff, α_incubation])
     mpx_init = init(prob, FunctionMap()) #Begins week 1
     old_recs = [0, 0]
     new_recs = [0, 0]
     wk_num = 1
     detected_cases = zeros(length(wkly_cases))
-    observed_cases = zeros(Int64, length(wkly_cases))
-
-    try
-        for i = 1:2 #Step forward 2 weeks (not used in fitting because early data)
-            step!(mpx_init, 7)
-            new_recs = [sum(mpx_init.u.x[1][10, :, :]), mpx_init.u.x[2][10]]
-            detected_cases[wk_num] = (sum(new_recs) - sum(old_recs)) * p_detect
-            wk_num += 1
-            old_recs = new_recs
+    # observed_cases = zeros(Int64, length(wkly_cases))
+    # M = 10.0
+    while L1_rel_err < 1.25 && wk_num <= length(wkly_cases) #Step forward weeks and add error kill if rel. L1 error goes above 1.5
+        step!(mpx_init,7) 
+        new_recs = [sum(mpx_init.u.x[1][10,:,:]),mpx_init.u.x[2][10]]
+        # detected_cases[wk_num] = (sum(new_recs) - sum(old_recs))*p_detect
+        actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1],p_detect*M,(1-p_detect)*M)),rand(BetaBinomial(new_recs[2] - old_recs[2],p_detect*M,(1-p_detect)*M))]
+        detected_cases[wk_num] = Float64.(sum(actual_obs))
+        if wk_num > 3 && wk_num < length(wkly_cases) # Only compare on weeks 3 --- (end-1)
+            # L1_rel_err += sum(abs,p_detect.*(new_recs .- old_recs) .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
+            L1_rel_err += sum(abs,actual_obs .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
         end
-
-        while L1_rel_err < 1.0 && wk_num < length(wkly_cases) #Step forward weeks and add error kill if rel. L1 error goes above 1
-            step!(mpx_init, 7)
-            new_recs = [sum(mpx_init.u.x[1][10, :, :]), mpx_init.u.x[2][10]]
-            detected_cases[wk_num] = (sum(new_recs) - sum(old_recs)) * p_detect
-            actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_recs[2] - old_recs[2], p_detect * M, (1 - p_detect) * M))]
-            # observed_cases[wk_num] = sum(actual_obs)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num] .* [0.99, 0.01]) / total_cases
-            wk_num += 1
-            old_recs = new_recs
-        end
-        # Last step for comparison purposes
-        step!(mpx_init, 7)
-        new_recs = [sum(mpx_init.u.x[1][10, :, :]), mpx_init.u.x[2][10]]
-        detected_cases[wk_num] = (sum(new_recs) - sum(old_recs)) * p_detect
-        return L1_rel_err, detected_cases
-    catch
-        return Inf, 0
+        wk_num += 1
+        old_recs = new_recs
     end
+    
+    return L1_rel_err, detected_cases
+    
 end
 
 ##
+# α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale 
+
+_p = [0.01, 0.5, 7, 0.1, 0.8,1,1.5]
+u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_uk, N_msm, 0.01, 0.75, 1/7, ps, 1.0;n_cliques = 50)
+Λ, B = setup_transmission_matrix(mean_daily_cnts, ps, N_clique; ingroup=0.99)
 
 
-_p = [0.01, 0.75, 7, 0.25, 0.8, 0.1]
+
 err, pred = mpx_sim_function(_p, constants, mpxv_wkly)
 
-plot(pred)
-scatter!(mpxv_wkly)
+plt = plot(pred)
+scatter!(plt,mpxv_wkly)
+display(plt)
+print(err)
 
 ## Priors
 
-# α_choose,p_detect,1/γ_eff,p_trans,R0_other,ρ
-prior_vect = [Gamma(2, 1 / 2), Beta(5, 5), Gamma(3, 7 / 3), Beta(10, 90), LogNormal(0, 0.5), Gamma(2, 50 / 2)]
+# α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale 
+prior_vect = [Gamma(1, 1), Beta(5, 5), Gamma(3, 7 / 3), Beta(10, 90), LogNormal(0, 0.5), Gamma(2, 10 / 2),LogNormal(0,0.5)]
 
 
 ##run ABC
 
 setup = ABCSMC(mpx_sim_function, #simulation function
-    6, # number of parameters
-    0.1, #target ϵ
+    7, # number of parameters
+    0.6, #target ϵ
     Prior(prior_vect); #Prior for each of the parameters
-    ϵ1=100.0,
+    ϵ1=100,
     convergence=0.05,
-    nparticles=2000,
+    nparticles=1000,
     kernel=gaussiankernel,
     constants=constants,
-    maxiterations=10^9)
+    maxiterations=10^10)
 
-smc = runabc(setup, mpxv_wkly, verbose=true, progress=true, parallel=true)
+smc = runabc(setup, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
 @save("results.jld2", smc)
