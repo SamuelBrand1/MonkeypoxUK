@@ -150,3 +150,101 @@ g = watts_strogatz(1000,7,0.)
 # # graphplot(G)
 # degs = length.(G.fadjlist)
 # histogram(degs)
+
+
+function draw_pwr_law(α;x_min = 1.0, x_max = 2800.0)
+    return (x_min^(-α) - (x_min^(-α) - x_max^(-α))*rand())^(-1/α)
+end
+
+
+
+Base.@kwdef mutable struct InfPerson
+    episode_phase::Symbol = :incubation
+    incubation_stage::Integer = 1
+    will_be_detected::Bool
+    contact_rate::Float64
+end
+
+Base.@kwdef mutable struct Group
+    highfreq::Bool
+    pop_size::Integer
+    contact_rates::Vector{Float64} = [0.0]
+    susceptible::Vector{Bool} = [true]
+    number_traced_contacts::Vector{Int64} = [1]
+    infecteds::Union{Vector{InfPerson},Vector{Int64}}
+end
+
+Base.@kwdef mutable struct Population
+    groups::Vector{Group}
+end
+
+function create_group(pop_size,p_detect,α,prop_init_inf,threshold;highfreq = true,x_max = 2800.0)
+    if highfreq
+        init_infs = rand(pop_size) .< prop_init_inf
+        ctrs = [draw_pwr_law(α;x_min = threshold, x_max = x_max) for n = 1:pop_size]
+        sus = trues(pop_size)
+        sus[init_infs] .= false
+        init_inf_array = [InfPerson(incubation_stage = rand(1:5),will_be_detected = rand() < p_detect,contact_rate = ctr)  for ctr in ctrs[init_infs]]
+        group = Group(highfreq = true,
+                    pop_size = pop_size,
+                    contact_rates = ctrs,
+                    susceptible = sus,
+                    number_traced_contacts = zeros(Int64,pop_size),
+                    infecteds = init_inf_array)
+        return group
+    else
+        init_inf_array = zeros(Int64,6)
+        group = Group(highfreq = false,
+                    pop_size = pop_size,
+                    contact_rates = zeros(pop_size),
+                    susceptible = trues(pop_size),
+                    number_traced_contacts = zeros(Int64,pop_size),
+                    infecteds = init_inf_array)
+        return group
+    end
+end
+
+function create_population(n_groups,α₀,p_detect,α,prop_init_inf,N_msm::Integer,N_nonmsm::Integer;threshold = 30.0,x_max = 2800.0)
+    groups = Vector{Group}(undef,n_groups+1)
+    prob_above_threshold = 1 - ((1 - threshold^(-α))/(1 - x_max^(-α)))
+    N_high_contact = rand(Binomial(N_msm,prob_above_threshold))
+
+    pop_sizes = rand(DirichletMultinomial(N_high_contact,α₀ * ones(n_groups)))
+    for n = 1:n_groups
+        group = create_group(pop_sizes[n],p_detect,α,prop_init_inf,threshold)
+        groups[n] = group
+    end
+    group_nonmsm = create_group(N_nonmsm + N_msm - N_high_contact,p_detect,α,prop_init_inf,threshold;highfreq = false)
+    groups[end] = group_nonmsm
+    return groups
+end
+
+@time group = create_group(6000,0.5,0.8,0.0001,30.0)
+@code_warntype create_group(600,0.5,0.8,0.0001,30.0)
+ProfileView.@profview create_group(6000,0.5,0.8,0.0001,30.0)
+@profile create_group(6000,0.5,0.8,0.0001,30.0)
+function testfunct()
+    group = create_group(100_000,0.5,0.8,0.0001,30.0)
+end
+group_nonmsm = create_group(100_000,0.5,0.8,0.0001;msm = false)
+
+@code_warntype create_population(1,3.0,0.5,0.8,0.000001,1_700_000,Int64(66e6))
+@time create_population(1,3.0,0.5,0.8,0.000001,1_700_000,Int64(66e6))
+@profile create_population(1,3.0,0.5,0.8,0.000001,1_700_000,Int64(66e6)) 
+
+
+@time pop_sizes = rand(DirichletMultinomial(1_700_000,3.0 * ones(10)))
+@time v = Vector{Group}(undef,10)
+
+function ranthis()
+    ctrs = [draw_pwr_law(0.8) for n = 1:15000]./365.25
+end
+function ranthis!(ctrs)
+    for i = 1:15000
+        ctrs[i] = draw_pwr_law(0.8)/365.25
+    end
+end
+
+@time ctrs = ranthis()
+
+@time ranthis!(ctrs)
