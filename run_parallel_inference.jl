@@ -22,8 +22,9 @@ end
                         Prior(prior_vect); #Prior for each of the parameters
                         ϵ1=100,
                         convergence=0.05,
-                        nparticles = 1000,
+                        nparticles = 500,
                         kernel=gaussiankernel,
                         constants=constants,
                         maxiterations=10^10)
-
+setups = fill(setup,4)
+smcs = pmap(s -> runabc(s, mpxv_wkly, verbose=true, progress=true),setups)

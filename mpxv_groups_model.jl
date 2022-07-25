@@ -249,50 +249,166 @@ setup = ABCSMC(mpx_sim_function, #simulation function
 smc = runabc(setup, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("results1.jld2", smc)
+@save("results2.jld2", smc)
 # preds = MLUtils.stack([part.other for part in smc.particles],dims = 1)
 ##
+# @load("results1.jld2")
+##
 
-preds = filter!(x -> length(x) == 11,[part.other for part in smc.particles])
-median_pred = [median([preds[n][t] for n = 1:length(preds)]) for t = 1:11]
-lb_pred = median_pred .- [quantile([preds[n][t] for n = 1:length(preds)],0.025) for t = 1:11]
-ub_pred = [quantile([preds[n][t] for n = 1:length(preds)],0.975) for t = 1:11] .- median_pred
+preds = filter!(x -> length(x) == length(mpxv_wkly),[part.other for part in smc.particles])
+median_pred = [median([preds[n][t] for n = 1:length(preds)]) for t = 1:length(mpxv_wkly)]
+lb_pred = median_pred .- [quantile([preds[n][t] for n = 1:length(preds)],0.025) for t = 1:length(mpxv_wkly)]
+ub_pred = [quantile([preds[n][t] for n = 1:length(preds)],0.975) for t = 1:length(mpxv_wkly)] .- median_pred
 plt = plot(ylims = (0,1000))
 # for pred in preds
 #     plot!(plt, pred, alpha=0.1, lw=2, color=:grey, lab="")
 # end
 plot!(plt,median_pred,ribbon = (lb_pred,ub_pred))
-scatter!(plt, 3:10, mpxv_wkly[3:(end-1)], lab="data (used in fitting)", color=:red)
-scatter!(plt, [1, 2, 11], mpxv_wkly[[1, 2, 11]], lab="data (not in fitting)", color=:blue)
+scatter!(plt, 3:11, mpxv_wkly[3:(end-1)], lab="data (used in fitting)", color=:red)
+scatter!(plt, [1, 2, 12], mpxv_wkly[[1, 2, 11]], lab="data (not in fitting)", color=:blue)
 display(plt)
 
-## 
-@load(["results.jld2"])
+## Change point model
 
-##
-posterior_draws_distrib =
-    [Normal(0.68, 0.63 / 3),
-        Normal(0.25, 0.17 / 3),
-        Normal(12.48, 8.3 / 3),
-        Normal(0.09, 0.03 / 3),
-        Normal(0.37, 0.12 / 3),
-        Normal(8.84, 7 / 3)]
+function mpx_sim_function_chp(params, constants, wkly_cases)
+    #Get constant data
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation,n_cliques = constants
+    #Get parameters and make transformations
+    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale,chp_t,trans_red = params
+    γ_eff = 1 / mean_inf_period #get recovery rate
+    # M = (1/ρ) + 1 #effective sample size for Beta-Binomial
+    #Generate random population structure
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale;n_cliques = n_cliques)
+    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
-posterior_draws = [clamp!(rand.(posterior_draws_distrib), 0.01, Inf) for k = 1:2000]
-mpx_sim_function(posterior_draws[1], constants, mpxv_wkly)[2]
-
-preds = [mpx_sim_function(draw, constants, mpxv_wkly)[2] for draw in posterior_draws]
-preds = filter(x -> x[end] > 0, preds)
-##
-plt = plot(xticks=(1:11, wks),
-    ylabel="Weekly reported MPX",
-    title="UK MPX",
-    size=(1000, 400), dpi=250,
-    left_margin=5mm)
-for pred in preds
-    plot!(plt, pred, alpha=0.1, lw=2, color=:grey, lab="")
+    #Simulate and track error
+    L1_rel_err = 0.0
+    total_cases = sum(wkly_cases[3:end-1])
+    u_mpx = ArrayPartition(u0_msm, u0_other)
+    prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
+                            u_mpx, (ts[1], ts[end]),
+                            [p_trans, R0_other, γ_eff, α_incubation])
+    mpx_init = init(prob, FunctionMap()) #Begins week 1
+    old_recs = [0, 0]
+    new_recs = [0, 0]
+    wk_num = 1
+    detected_cases = zeros(length(wkly_cases))
+    not_changed = true
+    # observed_cases = zeros(Int64, length(wkly_cases))
+    # M = 10.0
+    # while L1_rel_err < 1.25 && wk_num <= length(wkly_cases) #Step forward weeks and add error kill if rel. L1 error goes above 1.5
+    while wk_num <= length(wkly_cases) #Step forward weeks and add error kill if rel. L1 error goes above 1.5
+        if not_changed && mpx_init.t > chp_t ##Change point for transmission
+            not_changed = false
+            mpx_init.p[1] = mpx_init.p[1]*(1-trans_red)
+        end
+        step!(mpx_init,7)
+        new_recs = [sum(mpx_init.u.x[1][10,:,:]),mpx_init.u.x[2][10]]
+        # detected_cases[wk_num] = (sum(new_recs) - sum(old_recs))*p_detect
+        actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1],p_detect*M,(1-p_detect)*M)),rand(BetaBinomial(new_recs[2] - old_recs[2],p_detect*M,(1-p_detect)*M))]
+        detected_cases[wk_num] = Float64.(sum(actual_obs))
+        if wk_num > 3 && wk_num < length(wkly_cases) # Only compare on weeks 3 --- (end-1)
+            # L1_rel_err += sum(abs,p_detect.*(new_recs .- old_recs) .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
+            L1_rel_err += sum(abs,actual_obs .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
+        end
+        wk_num += 1
+        old_recs = new_recs
+    end
+    
+    return L1_rel_err, detected_cases
 end
-scatter!(plt, 3:10, mpxv_wkly[3:(end-1)], ms=7, lab="Data (used in fitting)", color=:red)
-scatter!(plt, [1, 2, 11], mpxv_wkly[[1, 2, 11]], ms=7, lab="Data (not in fitting)", color=:blue)
+
+##
+# α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
+
+_p = [0.01, 0.5, 7, 0.1, 0.,10,1.5,182,0.1]
+
+err, pred = mpx_sim_function_chp(_p, constants, mpxv_wkly)
+
+plt = plot(pred)
+scatter!(plt,mpxv_wkly)
 display(plt)
+print(err)
+
+## Priors - chg point model
+
+# α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
+prior_vect_cng_pnt = [Gamma(1, 1), 
+                Beta(5, 5), 
+                Gamma(3, 7 / 3), 
+                Beta(10, 90), 
+                LogNormal(0, 0.5), 
+                Gamma(2, 10 / 2),
+                LogNormal(0,0.5),
+                Uniform(152,ts[end]),
+                Uniform(0,1)]
+
+##
+
+##run ABC - chg point model
+
+setup_cng_pnt = ABCSMC(mpx_sim_function, #simulation function
+    9, # number of parameters
+    0.25, #target ϵ
+    Prior(prior_vect_cng_pnt); #Prior for each of the parameters
+    ϵ1=100,
+    convergence=0.05,
+    nparticles = 1000,
+    kernel=gaussiankernel,
+    constants=constants,
+    maxiterations=10^10)
+
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
+
+##
+
+@save("results_cng_pnt2.jld2",smc_cng_pnt)
+
+##
+
+preds_cng_pnt = filter!(x -> length(x) == length(mpxv_wkly),[part.other for part in smc_cng_pnt.particles])
+median_pred_cng_pnt = [median([preds_cng_pnt[n][t] for n = 1:length(preds)]) for t = 1:length(mpxv_wkly)]
+lb_pred_cng_pnt = median_pred_cng_pnt .- [quantile([preds_cng_pnt[n][t] for n = 1:length(preds)],0.025) for t = 1:length(mpxv_wkly)]
+ub_pred_cng_pnt = [quantile([preds_cng_pnt[n][t] for n = 1:length(preds)],0.975) for t = 1:length(mpxv_wkly)] .- median_pred_cng_pnt
+plt = plot(ylims = (0,1500))
+# for pred in preds
+#     plot!(plt, pred, alpha=0.1, lw=2, color=:grey, lab="")
+# end
+plot!(plt,median_pred_cng_pnt,ribbon = (lb_pred_cng_pnt,ub_pred_cng_pnt))
+plot!(plt,median_pred,ribbon = (lb_pred,ub_pred))
+
+scatter!(plt, 3:(length(mpxv_wkly)-1), mpxv_wkly[3:(end-1)], lab="data (used in fitting)", color=:red)
+scatter!(plt, [1, 2, length(mpxv_wkly)], mpxv_wkly[[1, 2, 11]], lab="data (not in fitting)", color=:blue)
+display(plt)
+
+
+##
+# @load(["results.jld2"])
+
+# ##
+# posterior_draws_distrib =
+#     [Normal(0.68, 0.63 / 3),
+#         Normal(0.25, 0.17 / 3),
+#         Normal(12.48, 8.3 / 3),
+#         Normal(0.09, 0.03 / 3),
+#         Normal(0.37, 0.12 / 3),
+#         Normal(8.84, 7 / 3)]
+
+# posterior_draws = [clamp!(rand.(posterior_draws_distrib), 0.01, Inf) for k = 1:2000]
+# mpx_sim_function(posterior_draws[1], constants, mpxv_wkly)[2]
+
+# preds = [mpx_sim_function(draw, constants, mpxv_wkly)[2] for draw in posterior_draws]
+# preds = filter(x -> x[end] > 0, preds)
+# ##
+# plt = plot(xticks=(1:11, wks),
+#     ylabel="Weekly reported MPX",
+#     title="UK MPX",
+#     size=(1000, 400), dpi=250,
+#     left_margin=5mm)
+# for pred in preds
+#     plot!(plt, pred, alpha=0.1, lw=2, color=:grey, lab="")
+# end
+# scatter!(plt, 3:10, mpxv_wkly[3:(end-1)], ms=7, lab="Data (used in fitting)", color=:red)
+# scatter!(plt, [1, 2, 11], mpxv_wkly[[1, 2, 11]], ms=7, lab="Data (not in fitting)", color=:blue)
+# display(plt)
 
