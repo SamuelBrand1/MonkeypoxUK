@@ -354,6 +354,7 @@ setup_cng_pnt = ABCSMC(mpx_sim_function, #simulation function
     ϵ1=100,
     convergence=0.05,
     nparticles = 1000,
+    α = 0.5,
     kernel=gaussiankernel,
     constants=constants,
     maxiterations=10^10)
