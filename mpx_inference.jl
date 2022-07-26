@@ -221,15 +221,15 @@ print(err)
 ## Priors - chg point model
 
 # α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
-prior_vect_cng_pnt = [Gamma(1, 1), # α_choose
-                Beta(5, 5), #p_detect 
-                Gamma(4, 7 / 4), #mean_inf_period 
-                Beta(10, 90), #p_trans  
-                LogNormal(log(0.75), 0.2), #R0_other
-                Gamma(3, 10 / 3),#  M
-                LogNormal(0,0.5),#init_scale
-                Uniform(152,ts[end]),# chp_t
-                Beta(70,30)]#trans_red
+prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
+                Beta(5, 5), #p_detect  2
+                Gamma(4, 7 / 4), #mean_inf_period 3
+                Beta(10, 90), #p_trans  4
+                LogNormal(log(0.75), 0.2), #R0_other 5
+                Gamma(3, 10 / 3),#  M 6
+                LogNormal(0,0.5),#init_scale 7
+                Uniform(152,ts[end]),# chp_t 8
+                Beta(5,5)]#trans_red 9
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
 prior_sims = map(θ -> mpx_sim_function_chp(θ,constants,mpxv_wkly),draws)
@@ -243,12 +243,6 @@ for pred in prior_preds
 end
 display(plt)
 savefig(plt,"plots/prior_predictive_checking_plot.png")
-## Prior error spread
-
-errs = [sim[1] for sim in prior_sims]
-histogram(errs,nbins = 100,norm = :pdf)
-
-sum(errs .< 1.0)/1000
 
 ## Model-based calibration of target tolerance
 median_mbc_errs = map(n -> median(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
@@ -258,18 +252,22 @@ err_hist = histogram(median_mbc_errs,norm = :pdf,nbins = 200,
             title = "Sampled errors from simulations with exact parameters",
             xlabel = "Median L1 relative error",
             size = (700,400))
-vline!(err_hist,[0.35],lab = "0.35 rel L1 error" )
+vline!(err_hist,[0.34],lab = "0.34 rel L1 error" )
+display(err_hist)
 savefig(err_hist,"plots/mbc_error_calibartion_plt.png")
 ##Run inference
 
-setup_cng_pnt = ABCSMC(mpx_sim_function, #simulation function
+setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     9, # number of parameters
-    0.35, #target ϵ
+    0.34, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=100,
     convergence=0.05,
-    nparticles = 2000,
+    nparticles = 1000,
     α = 0.5,
     kernel=gaussiankernel,
     constants=constants,
     maxiterations=10^10)
+
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
+    
