@@ -240,26 +240,23 @@ display(plt)
 savefig(plt,"plots/prior_predictive_checking_plot.png")
 
 ## Model-based calibration of target tolerance
-median_mbc_errs = map(n -> median(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
+min_mbc_errs = map(n -> minimum(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
 
-sim = mpx_sim_function_chp(draws[35], constants, prior_sims[35][2])
-plot(sim[2])
-plot!(prior_sims[35][2])
 
 ##
-err_hist = histogram(median_mbc_errs,norm = :pdf,nbins = 200,
+err_hist = histogram(min_mbc_errs,norm = :pdf,nbins = 200,
             lab = "",
             title = "Sampled errors from simulations with exact parameters",
             xlabel = "Median L1 relative error",
             size = (700,400))
-vline!(err_hist,[0.7],lab = "5th percentile (rel. err. = 0.34)" )
+vline!(err_hist,[0.543],lab = "5th percentile (rel. err. = 0.543)",lw = 3)
 display(err_hist)
 savefig(err_hist,"plots/mbc_error_calibration_plt.png")
 ##Run inference
 
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     9, # number of parameters
-    0.67, #target ϵ
+    0.543, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=100,
     convergence=0.05,
@@ -270,4 +267,18 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     maxiterations=10^10)
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
-    
+
+##
+@save("draws2_nrw.jld2",smc_cng_pnt)
+
+
+##posterior predictive checking - simulation
+post_preds = [part.other for part in smc_cng_pnt.particles]
+plt = plot(;ylabel = "Weekly cases",
+            title = "Prior predictive checking")
+for pred in post_preds
+    plot!(plt,wks,pred,lab = "", color = :grey, alpha = 0.3)
+end
+scatter!(plt,wks,mpxv_wkly,lab = "Data")
+display(plt)
+
