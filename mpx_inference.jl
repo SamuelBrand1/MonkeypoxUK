@@ -252,9 +252,9 @@ err_hist = histogram(median_mbc_errs,norm = :pdf,nbins = 200,
             title = "Sampled errors from simulations with exact parameters",
             xlabel = "Median L1 relative error",
             size = (700,400))
-vline!(err_hist,[0.34],lab = "0.34 rel L1 error" )
+vline!(err_hist,[0.34],lab = "5th percentile (rel. err. = 0.34)" )
 display(err_hist)
-savefig(err_hist,"plots/mbc_error_calibartion_plt.png")
+savefig(err_hist,"plots/mbc_error_calibration_plt.png")
 ##Run inference
 
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
