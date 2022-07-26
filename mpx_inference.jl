@@ -1,6 +1,6 @@
 ## Idea is to have both fitness and SBM effects in sexual contact
 
-using Distributions, StatsBase
+using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
 using JLD2, MLUtils
@@ -8,7 +8,6 @@ using JLD2, MLUtils
 ## Grab UK data
 
 include("mpxv_datawrangling.jl");
-
 
 ## UK group sizes
 
@@ -118,14 +117,11 @@ function f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
 
     #force of infection
     total_I = I_other + sum(I)
-    λ = (((N_msm / N_total) * γ_eff * R0_other * total_I) .+( p_trans .* (Λ * I * B))) ./ (N_grp_msm .+ 10)
+    λ = (p_trans .* (Λ * I * B)) ./ (N_grp_msm .+ 1e-5)
     λ_other = γ_eff * R0_other * total_I / N_total
-    if any(λ .< 0)
-        print("Neg inf rate")
-    end
     #number of events
     
-    num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-λ))#infections among MSM
+    num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-(λ .+ λ_other)))#infections among MSM
     num_incs = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E)#incubation among MSM
     num_recs = map(n -> rand(Binomial(n, 1 - exp(-γ_eff))), I)#recovery among MSM
     num_infs_other = rand(Binomial(S_other, 1 - exp(-λ_other)))#infections among non MSM
@@ -190,7 +186,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     while wk_num <= length(wkly_cases) #Step forward a week
         if not_changed && mpx_init.t > chp_t ##Change point for transmission
             not_changed = false
-            mpx_init.p[1] = mpx_init.p[1]*(1-trans_red)
+            mpx_init.p[1] = mpx_init.p[1]*(1-trans_red) #Reduce transmission after the change point
         end
         step!(mpx_init,7)
         new_recs = [sum(mpx_init.u.x[1][10,:,:]),mpx_init.u.x[2][10]]
@@ -209,7 +205,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 end
 
 ##
-_p = [0.01, 0.5, 7, 0.2, 0.,10,1.5,182,1.0]
+_p = [0.01, 0.5, 20, 0.2, 0.5,10,1.5,182,1.0]
 
 err, pred = mpx_sim_function_chp(_p, constants, mpxv_wkly)
 
@@ -223,17 +219,16 @@ print(err)
 # α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
                 Beta(5, 5), #p_detect  2
-                Gamma(4, 7 / 4), #mean_inf_period 3
-                Beta(10, 90), #p_trans  4
-                LogNormal(log(0.75), 0.2), #R0_other 5
+                Gamma(3, 10 / 3), #mean_inf_period 3
+                Beta(5, 45), #p_trans  4
+                LogNormal(log(0.75), 0.25), #R0_other 5
                 Gamma(3, 10 / 3),#  M 6
-                LogNormal(0,0.5),#init_scale 7
+                LogNormal(0,1),#init_scale 7
                 Uniform(152,ts[end]),# chp_t 8
                 Beta(5,5)]#trans_red 9
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
 prior_sims = map(θ -> mpx_sim_function_chp(θ,constants,mpxv_wkly),draws)
-
 ##Prior predictive checking - simulation
 prior_preds = [sim[2] for sim in prior_sims]
 plt = plot(;ylabel = "Weekly cases",
@@ -246,20 +241,25 @@ savefig(plt,"plots/prior_predictive_checking_plot.png")
 
 ## Model-based calibration of target tolerance
 median_mbc_errs = map(n -> median(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
+
+sim = mpx_sim_function_chp(draws[35], constants, prior_sims[35][2])
+plot(sim[2])
+plot!(prior_sims[35][2])
+
 ##
 err_hist = histogram(median_mbc_errs,norm = :pdf,nbins = 200,
             lab = "",
             title = "Sampled errors from simulations with exact parameters",
             xlabel = "Median L1 relative error",
             size = (700,400))
-vline!(err_hist,[0.34],lab = "5th percentile (rel. err. = 0.34)" )
+vline!(err_hist,[0.7],lab = "5th percentile (rel. err. = 0.34)" )
 display(err_hist)
 savefig(err_hist,"plots/mbc_error_calibration_plt.png")
 ##Run inference
 
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     9, # number of parameters
-    0.34, #target ϵ
+    0.67, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=100,
     convergence=0.05,
