@@ -53,16 +53,16 @@ min_mbc_errs = map(n -> minimum(map(x -> mpx_sim_function_chp(draws[n],constants
 err_hist = histogram(min_mbc_errs,norm = :pdf,nbins = 200,
             lab = "",
             title = "Sampled errors from simulations with exact parameters",
-            xlabel = "Median L1 relative error",
+            xlabel = "L1 relative error",
             size = (700,400))
-vline!(err_hist,[0.58],lab = "5th percentile (rel. err. = 0.58)",lw = 3)
+vline!(err_hist,[0.7],lab = "5th percentile (rel. err. = 0.7)",lw = 3)
 display(err_hist)
 savefig(err_hist,"plots/mbc_error_calibration_plt.png")
 ##Run inference
 
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     9, # number of parameters
-    0.58, #target ϵ
+    0.7, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=100,
     convergence=0.05,
