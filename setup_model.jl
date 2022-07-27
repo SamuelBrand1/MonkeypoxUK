@@ -56,7 +56,7 @@ mean_daily_cnts = map(x -> (α_scaling / (α_scaling - 1)) * (x[1]^(1 - α_scali
 
 ##
 
-function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_states=10, n_cliques=50)
+function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_states=7, n_cliques=50)
     u0_msm = zeros(Int64, n_states, length(ps), n_cliques)
     u0_other = zeros(Int64, n_states)
     N_clique = rand(DirichletMultinomial(N_msm, α_choose * ones(n_cliques)))
@@ -65,8 +65,8 @@ function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps, init
     end
     #Add infecteds so that expected detections on week 1 are 1
     choose_clique = rand(Categorical(normalize(N_clique, 1)))
-    av_infs = 8 * init_scale / (p_detect * (1 - exp(-γ_eff))) #Set av number of infecteds across 8 categories of incubation and infectious rescaled by daily probability of detection if infectious
-    u0_msm[2:9, :, choose_clique] .= map(μ -> rand(Poisson(μ)), fill(av_infs / (8 * length(ps)), 8, length(ps)))
+    av_infs = 5 * init_scale / (p_detect * (1 - exp(-γ_eff))) #Set av number of infecteds across 5 categories of incubation and infectious rescaled by daily probability of detection if infectious
+    u0_msm[2:6, :, choose_clique] .= map(μ -> rand(Poisson(μ)), fill(av_infs / (5 * length(ps)), 5, length(ps)))
     u0_msm = u0_msm[:, :, N_clique.>0] #Reduce group size
     #Set up non MSM population
     u0_other[1] = N_pop
@@ -104,13 +104,13 @@ function f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
 
     #states
     S = @view u.x[1][1, :, :]
-    E = @view u.x[1][2:8, :, :]
-    I = @view u.x[1][9, :, :]
-    R = @view u.x[1][10, :, :]
+    E = @view u.x[1][2:5, :, :]
+    I = @view u.x[1][6, :, :]
+    R = @view u.x[1][7, :, :]
     S_other = u.x[2][1]
-    E_other = @view u.x[2][2:8]
-    I_other = u.x[2][9]
-    R_other = u.x[2][10]
+    E_other = @view u.x[2][2:5]
+    I_other = u.x[2][6]
+    R_other = u.x[2][7]
 
     #force of infection
     total_I = I_other + sum(I)
@@ -134,15 +134,15 @@ function f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
     du.x[2][1] -= num_infs_other
     du.x[2][2] += num_infs_other
     #incubations
-    du.x[1][2:8, :, :] .-= num_incs
-    du.x[1][3:9, :, :] .+= num_incs
-    du.x[2][2:8] .-= num_incs_other
-    du.x[2][3:9] .+= num_incs_other
+    du.x[1][2:5, :, :] .-= num_incs
+    du.x[1][3:6, :, :] .+= num_incs
+    du.x[2][2:5] .-= num_incs_other
+    du.x[2][3:6] .+= num_incs_other
     #recoveries
-    du.x[1][9, :, :] .-= num_recs
-    du.x[1][10, :, :] .+= num_recs
-    du.x[2][9] -= num_recs_other
-    du.x[2][10] += num_recs_other
+    du.x[1][6, :, :] .-= num_recs
+    du.x[1][7, :, :] .+= num_recs
+    du.x[2][6] -= num_recs_other
+    du.x[2][7] += num_recs_other
 
     return nothing
 end
@@ -241,7 +241,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
             mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
         end
         step!(mpx_init, 7)
-        new_recs = [sum(mpx_init.u.x[1][10, :, :]), mpx_init.u.x[2][10]]
+        new_recs = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
         # detected_cases[wk_num] = (sum(new_recs) - sum(old_recs))*p_detect
         actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_recs[2] - old_recs[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num] = Float64.(sum(actual_obs))
