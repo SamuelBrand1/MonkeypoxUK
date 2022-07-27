@@ -8,10 +8,10 @@ using JLD2, MLUtils
 ## Grab UK data
 
 include("mpxv_datawrangling.jl");
-
+include("setup_model.jl");
 
 ##
-_p = [0.01, 0.5, 20, 0.2, 0.5,10,1.5,182,1.0]
+_p = [0.01, 0.5, 20, 0.2, 0.5,6,1.5,130,1.0]
 
 err, pred = mpx_sim_function_chp(_p, constants, mpxv_wkly)
 
@@ -25,13 +25,13 @@ print(err)
 # α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
                 Beta(5, 5), #p_detect  2
-                Gamma(3, 10 / 3), #mean_inf_period 3
+                Gamma(3, 6 / 3), #mean_inf_period - 1  3
                 Beta(5, 45), #p_trans  4
                 LogNormal(log(0.75), 0.25), #R0_other 5
                 Gamma(3, 10 / 3),#  M 6
                 LogNormal(0,1),#init_scale 7
                 Uniform(152,ts[end]),# chp_t 8
-                Beta(5,5)]#trans_red 9
+                Beta(1.5,1.5)]#trans_red 9
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
 prior_sims = map(θ -> mpx_sim_function_chp(θ,constants,mpxv_wkly),draws)
@@ -55,14 +55,14 @@ err_hist = histogram(min_mbc_errs,norm = :pdf,nbins = 200,
             title = "Sampled errors from simulations with exact parameters",
             xlabel = "Median L1 relative error",
             size = (700,400))
-vline!(err_hist,[0.543],lab = "5th percentile (rel. err. = 0.543)",lw = 3)
+vline!(err_hist,[0.58],lab = "5th percentile (rel. err. = 0.58)",lw = 3)
 display(err_hist)
 savefig(err_hist,"plots/mbc_error_calibration_plt.png")
 ##Run inference
 
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     9, # number of parameters
-    0.543, #target ϵ
+    0.58, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=100,
     convergence=0.05,
