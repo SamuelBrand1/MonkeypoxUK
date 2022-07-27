@@ -45,3 +45,6 @@ scatter!(plt,wks[3:(end-1)],mpxv_wkly[3:(end-1)],lab = "Data (used in fitting)",
 display(plt)
 
 
+## Public health emergency effect forecast
+
+

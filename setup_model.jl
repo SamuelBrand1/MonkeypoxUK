@@ -158,7 +158,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale;n_cliques = n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
     vac_shape_arry = zeros(size(u0_msm))
-
+    
     #Simulate and track error
     L1_rel_err = 0.0
     total_cases = sum(wkly_cases[3:end-1])
