@@ -23,11 +23,11 @@ params_no_red = map(θ -> [θ[1:(end-2)];0.0;0.0], param_draws)
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12,2)]
 
-preds = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], param_draws)
+preds_rwc = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], param_draws)
 # preds_nored = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], params_no_red)
-## Public health emergency effect forecast
+## Public health emergency effect forecasts
 
-wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 11)]
+wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 11)] * 1.5
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
 inf_duration_red = 0.0
 interventions_ensemble = [(trans_red2 = rand(Beta(32/20,68/20)),#Based on posterior for first change point with extra dispersion
@@ -35,53 +35,83 @@ interventions_ensemble = [(trans_red2 = rand(Beta(32/20,68/20)),#Based on poster
                                 trans_red_other2 = rand(Beta(80/20,20/20)),
                                 wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
+no_interventions_ensemble = [(trans_red2 = 0.0,#Based on posterior for first change point with extra dispersion
+                                vac_effectiveness = 0.0,
+                                trans_red_other2 = 0.0,
+                                wkly_vaccinations = zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
-# preds_interventions = map(θ -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, interventions)[2], param_draws)
-# incidence_interventions = map(θ -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, interventions)[3], param_draws[1:2])
+
 preds_and_incidence_interventions = map((θ,intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws,interventions_ensemble)
+preds_and_incidence_no_interventions = map((θ,intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws,no_interventions_ensemble)
+
+##Gather data
 preds = [x[1] for x in preds_and_incidence_interventions]
 incidences = [x[2] for x in preds_and_incidence_interventions]
+cum_incidences = [cumsum(x[2],dims = 1) for x in preds_and_incidence_interventions]
+cum_cases = [cumsum(x[1],dims=1) for x in preds_and_incidence_interventions]
+cum_cases_forwards = [cumsum(x[1][13:end,:],dims=1) for x in preds_and_incidence_interventions]
+
+cum_cases_nointervention = [cumsum(x[1],dims = 1) for x in preds_and_incidence_no_interventions]
+cum_cases_nointervention_forwards = [cumsum(x[1][13:end,:],dims = 1) for x in preds_and_incidence_no_interventions]
+cum_incidences_nointervention = [cumsum(x[2],dims = 1) for x in preds_and_incidence_no_interventions]
+
 ##Simulation projections
 
-median_pred = hcat([median([preds[n][wk,1] for n = 1:length(preds)]) for wk in 1:length(long_wks)],
-[median([preds[n][wk,2] for n = 1:length(preds)]) for wk in 1:length(long_wks)])
-# median_pred_no_red = [median([preds_nored[n][wk] for n = 1:length(preds_nored)]) for wk in 1:length(long_wks)]
-# median_pred_interventions = [median([preds_interventions[n][wk] for n = 1:length(preds_interventions)]) for wk in 1:length(long_wks)]
+cred_int = cred_intervals(preds)
+cred_int_rwc = cred_intervals(preds_rwc)
 
-lb_pred_25 = median_pred .- hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.25) for wk in 1:length(long_wks)],
-                                [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.25) for wk in 1:length(long_wks)])
-
-lb_pred_025 = median_pred .- hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.025) for wk in 1:length(long_wks)],
-[quantile([preds[n][wk,2] for n = 1:length(preds)], 0.025) for wk in 1:length(long_wks)])
-
-ub_pred_25 = hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.75) for wk in 1:length(long_wks)],
-                        [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.75) for wk in 1:length(long_wks)]) .- median_pred
-ub_pred_025 = hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.975) for wk in 1:length(long_wks)],
-                        [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.975) for wk in 1:length(long_wks)]) .- median_pred
-
-##
 plt = plot(; ylabel="Weekly cases",
-        title="UK MPVX reasonable worst case",yscale=:log10,
+        title="UK Monkeypox Case Projections",yscale=:log10,
         legend=:topleft,
         yticks=([1,2, 11, 101, 1001], [0,1, 10, 100, 1000]),
+        ylims = (0.8,3001),
         left_margin=5mm,
-        size=(800, 600), dpi=250)
-plot!(plt, long_wks, median_pred .+ 1, ribbon=(lb_pred_025, ub_pred_025), lw=0,
-        color=[1 2], fillalpha=0.3, lab=["MSM" "non-MSM"])
-plot!(plt, long_wks, median_pred .+ 1, ribbon=(lb_pred_25, ub_pred_25), lw=3,
+        size=(800, 600), dpi=250,
+        tickfont = 11,titlefont = 18,guidefont = 18,legendfont = 11)
+plot!(plt, long_wks, cred_int.median_pred .+ 1, ribbon=(cred_int.lb_pred_025, cred_int.ub_pred_025), lw=0,
+        color=[1 2], fillalpha=0.3, lab=["Projection: MSM" "Projection: non-MSM"])
+plot!(plt, long_wks, cred_int.median_pred .+ 1, ribbon=(cred_int.lb_pred_25, cred_int.ub_pred_25), lw=3,
         color=[1 2], fillalpha=0.3, lab="")
-# plot!(plt, long_wks, median_pred_no_red, lw=3,
-#         color=:red, fillalpha=0.3, lab="Projection (no red. in risk)")
-# plot!(plt, long_wks, median_pred_interventions, lw=3,
-#         color=:blue, fillalpha=0.3, lab="Projection (interventions)")
+plot!(plt, long_wks[11:end], cred_int_rwc.median_pred[11:end,:], lw=3,ls = :dash,
+        color= [1 2] , fillalpha=0.3, lab="")
+
 scatter!(plt, wks[[1, 2, end]], mpxv_wkly[[1, 2, end],:].+1,
-                lab="Data (not used in fitting)", 
+                lab="", 
                 ms=6, color=[1 2],shape = :square)
 scatter!(plt, wks[3:(end-1)], mpxv_wkly[3:(end-1),:] .+ 1, 
-                lab="Data (used in fitting)", 
+                lab=["Data: MSM" "Data: non-MSM"], 
                 ms=6, color=[1 2])
 
 display(plt)
-savefig(plt, "reasonable_worst_case.png")
+savefig(plt, "plots/case_projections.png")
+
+##cumulative Incidence plots
+# cred_int_cum_incidence = cred_intervals(cum_incidences)
+# cred_int_cum_incidence_no_intervention = cred_intervals(cum_incidences_nointervention)
+cred_int_cum_incidence = cred_intervals(cum_cases_forwards)
+cred_int_cum_incidence_no_intervention = cred_intervals(cum_cases_nointervention_forwards)
 
 
+total_cases = sum(mpxv_wkly,dims = 1)
+
+plt = plot(; ylabel="Cumulative cases",
+        title="UK Monkeypox cumulative case projections",#yscale=:log10,
+        legend=:topleft,
+        yticks = (0:2500:12500,0:2500:12500),
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont = 11,titlefont = 18,guidefont = 18,legendfont = 11)
+plot!(plt, long_wks[13:end], total_cases .+ cred_int_cum_incidence.median_pred , ribbon=(cred_int_cum_incidence.lb_pred_025, cred_int_cum_incidence.ub_pred_025), lw=0,
+        color=[1 2], fillalpha=0.3, lab=["Projection: MSM" "Projection: non-MSM"])
+
+plot!(plt, long_wks[13:end], total_cases .+ cred_int_cum_incidence.median_pred, ribbon=(cred_int_cum_incidence.lb_pred_25, cred_int_cum_incidence.ub_pred_25), lw=3,
+        color=[1 2], fillalpha=0.3, lab="")        
+plot!(plt, long_wks[13:end], total_cases .+ cred_int_cum_incidence_no_intervention.median_pred, lw=3,ls = :dash,
+        color= [1 2] , fillalpha=0.3, lab="")        
+scatter!(plt, wks, cumsum(mpxv_wkly,dims = 1), 
+        lab=["Data: MSM" "Data: non-MSM"], 
+        ms=6, color=[1 2])
+
+display(plt)
+savefig(plt,"plots/cumcaseprojections.png")
+                

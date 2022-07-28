@@ -354,5 +354,23 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     return L1_rel_err, detected_cases, incidence
 end
 
-##Posterior draws
+function cred_intervals(preds)
+    median_pred = hcat([median([preds[n][wk,1] for n = 1:length(preds)]) for wk in 1:size(preds[1],1)],
+    [median([preds[n][wk,2] for n = 1:length(preds)]) for wk in 1:size(preds[1],1)])
+    # median_pred_no_red = [median([preds_nored[n][wk] for n = 1:length(preds_nored)]) for wk in 1:size(preds[1],1)]
+    # median_pred_interventions = [median([preds_interventions[n][wk] for n = 1:length(preds_interventions)]) for wk in 1:size(preds[1],1)]
+
+    lb_pred_25 = median_pred .- hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1],1)],
+                                    [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1],1)])
+
+    lb_pred_025 = median_pred .- hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1],1)],
+    [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1],1)])
+
+    ub_pred_25 = hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1],1)],
+                            [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1],1)]) .- median_pred
+    ub_pred_025 = hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1],1)],
+                            [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1],1)]) .- median_pred
+    return (;median_pred,lb_pred_025,lb_pred_25,ub_pred_25,ub_pred_025)
+end
+
 
