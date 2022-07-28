@@ -2,10 +2,11 @@
 
 N_uk = 67.22e6
 prop_ovr18 = 0.787
+prop_men = 0.5
 prop_msm = 0.034 #https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/sexuality/bulletins/sexualidentityuk/2020
 prop_sexual_active = 1 - 0.154 #A dynamic power-law sexual network model of gonorrhoea outbreaks
 
-N_msm = round(Int64, N_uk * prop_ovr18 * prop_msm * prop_sexual_active) #~1.5m
+N_msm = round(Int64, N_uk * prop_men * prop_ovr18 * prop_msm * prop_sexual_active) #~1.5m
 
 ## Incubation period
 
@@ -78,7 +79,7 @@ function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps, init
     u0_msm[2:6, :, choose_clique] .= map(μ -> rand(Poisson(μ)), fill(av_infs / (5 * length(ps)), 5, length(ps)))
     u0_msm = u0_msm[:, :, N_clique.>0] #Reduce group size
     #Set up non MSM population
-    u0_other[1] = N_pop
+    u0_other[1] = N_pop - N_msm
     N_grp_msm = u0_msm[1, :, :]
     return u0_msm, u0_other, N_clique[N_clique.>0], N_grp_msm
 end
@@ -161,15 +162,15 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
 
     #states
     S = @view u.x[1][1, :, :]
-    E = @view u.x[1][2:8, :, :]
-    I = @view u.x[1][9, :, :]
-    R = @view u.x[1][10, :, :]
-    V = @view u.x[1][11, :, :]
+    E = @view u.x[1][2:5, :, :]
+    I = @view u.x[1][6, :, :]
+    R = @view u.x[1][7, :, :]
+    V = @view u.x[1][8, :, :]
 
     S_other = u.x[2][1]
-    E_other = @view u.x[2][2:8]
-    I_other = u.x[2][9]
-    R_other = u.x[2][10]
+    E_other = @view u.x[2][2:5]
+    I_other = u.x[2][6]
+    R_other = u.x[2][7]
 
     #force of infection
     total_I = I_other + sum(I)
@@ -190,20 +191,20 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total)
     du.x[2] .= u.x[2]
     #infections
     du.x[1][1, :, :] .-= num_infs
-    du.x[1][11, :, :] .-= num_infs_vac
+    du.x[1][8, :, :] .-= num_infs_vac
     du.x[1][2, :, :] .+= num_infs .+ num_infs_vac
     du.x[2][1] -= num_infs_other
     du.x[2][2] += num_infs_other
     #incubations
-    du.x[1][2:8, :, :] .-= num_incs
-    du.x[1][3:9, :, :] .+= num_incs
-    du.x[2][2:8] .-= num_incs_other
-    du.x[2][3:9] .+= num_incs_other
+    du.x[1][2:5, :, :] .-= num_incs
+    du.x[1][3:6, :, :] .+= num_incs
+    du.x[2][2:5] .-= num_incs_other
+    du.x[2][3:6] .+= num_incs_other
     #recoveries
-    du.x[1][9, :, :] .-= num_recs
-    du.x[1][10, :, :] .+= num_recs
-    du.x[2][9] -= num_recs_other
-    du.x[2][10] += num_recs_other
+    du.x[1][6, :, :] .-= num_recs
+    du.x[1][7, :, :] .+= num_recs
+    du.x[2][6] -= num_recs_other
+    du.x[2][7] += num_recs_other
 
     return nothing
 end
@@ -220,11 +221,12 @@ constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, α_incubation_eff, n
 function mpx_sim_function_chp(params, constants, wkly_cases)
     #Get constant data
     N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
+
     #Get parameters and make transformations
     α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
     p_γ = 1 / (1 + mean_inf_period)
     γ_eff = -log(1-p_γ) #get recovery rate
-    # M = (1/ρ) + 1 #effective sample size for Beta-Binomial
+
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
@@ -270,29 +272,30 @@ end
 function mpx_sim_function_interventions(params, constants, wkly_cases, interventions)
     #Get constant data
     N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
+    
     #Get intervention data
     chp_t2 = interventions.chp_t2
     wkly_vaccinations = interventions.wkly_vaccinations
     trans_red2 = interventions.trans_red2
     inf_duration_red = interventions.inf_duration_red
     vac_effectiveness = interventions.vac_effectiveness
-    R0_other_red = interventions.R0_other_red
-
+    trans_red_other2 = interventions.trans_red_other2
 
     #Get parameters and make transformations
-    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red = params
-    γ_eff = 1 / mean_inf_period #get recovery rate
+    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
+    p_γ = 1 / (1 + mean_inf_period)
+    γ_eff = -log(1-p_γ) #get recovery rate
 
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_states=11, n_cliques=n_cliques)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale;n_states = 8, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
     #Simulate and track error
     L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[3:end-1])
+    total_cases = sum(wkly_cases[3:end-1,:])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-        u_mpx, (ts[1], ts[1] + 7 * length(wkly_cases)),
+        u_mpx, (ts[1], ts[1] + 7 * size(wkly_cases,1)),
         [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
     old_recs = [0, 0]
@@ -300,47 +303,52 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     old_sus = [sum(u0_msm[1, :, :]), u0_other[1]]
     new_sus = [sum(u0_msm[1, :, :]), u0_other[1]]
     wk_num = 1
-    detected_cases = zeros(length(wkly_cases))
-    incidence = zeros(length(wkly_cases))
+    detected_cases = zeros(size(wkly_cases))
+    incidence = zeros(size(wkly_cases))
 
     not_changed = true
     not_changed2 = true
 
 
-    while wk_num <= length(wkly_cases) #Step forward a week
+    while wk_num <= size(wkly_cases,1) #Step forward a week
+        #Change points
         if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
             not_changed = false
             mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
+            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce non-sexual transmission after the change point
         end
         if not_changed2 && mpx_init.t > chp_t2 ##2nd change point for transmission 
             not_changed2 = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - R0_other_red) #Reduce transmission after the change point
-            mpx_init.p[3] = 1 / (mean_inf_period * (1 - inf_duration_red)) #Reduce duration of transmission after the change point
+            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
+            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
+            p_γ = 1 / (1 + (mean_inf_period * (1 - inf_duration_red)))
+            mpx_init.p[3] = -log(1-p_γ) #Reduce duration of transmission after the change point
         end
         #Step forward a week in time
         step!(mpx_init, 7)
+
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / sum(du_vac.x[1][1, 3:end, :])
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
         num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
-        du_vac.x[1][11, 3:end, :] .+= num_vaccines
+        du_vac.x[1][8, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
+
         #Calculate actual recoveries and score errors
-        new_recs = [sum(mpx_init.u.x[1][10, :, :]), mpx_init.u.x[2][10]]
+        new_recs = [sum(mpx_init.u.x[1][7, :, :]), mpx_init.u.x[2][7]]
         new_sus = [sum(mpx_init.u.x[1][1, :, :]), mpx_init.u.x[2][1]]
         actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_recs[2] - old_recs[2], p_detect * M, (1 - p_detect) * M))]
-        detected_cases[wk_num] = Float64.(sum(actual_obs))
-        incidence[wk_num] = Float64.(sum(old_sus .- new_sus) - sum(num_vaccines))
-        if wk_num > 3 && wk_num < length(wkly_cases) # Only compare on weeks 3 --- (end-1)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num] .* [0.99, 0.01]) / total_cases
+        detected_cases[wk_num,:] .= Float64.(actual_obs)
+        incidence[wk_num,:] = Float64.([old_sus[1] - new_sus[1] - sum(num_vaccines),old_sus[2] - new_sus[2]])
+        if wk_num > 3 && wk_num < size(wkly_cases,1) # Only compare on weeks 3 --- (end-1)
+            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num,:]) / total_cases
         end
+        #Move time forwards one week
         wk_num += 1
         old_recs = new_recs
         old_sus = new_sus
-
     end
 
     return L1_rel_err, detected_cases, incidence

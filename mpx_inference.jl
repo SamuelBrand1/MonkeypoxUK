@@ -58,13 +58,13 @@ err_hist = histogram(mbc_errs, norm=:pdf, nbins=500,
     lab="",
     title="Sampled errors from simulations with exact parameters",
     xlabel="L1 relative error",
-    xlims=(0, 2),
+    xlims=(0, 5),
     size=(700, 400))
-vline!(err_hist, [0.2325], lab="$(round(Int64,target_perc*100))th percentile (target err. = $(round(ϵ_target,digits = 3)))", lw=3)
+vline!(err_hist, [ϵ_target], lab="$(round(Int64,target_perc*100))th percentile (target err. = $(round(ϵ_target,digits = 3)))", lw=3)
 display(err_hist)
 savefig(err_hist, "plots/mbc_error_calibration_plt.png")
-##Run inference
 
+##Run inference
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     10, # number of parameters
     ϵ_target, #target ϵ
@@ -80,7 +80,7 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("smc_posterior_draws2.jld2", smc_cng_pnt)
+@save("smc_posterior_draws.jld2", smc_cng_pnt)
 
 
 ##posterior predictive checking - simulation
@@ -89,9 +89,9 @@ post_preds = [part.other for part in smc_cng_pnt.particles]
 plt = plot(; ylabel="Weekly cases",
     title="Posterior predictive checking")
 for pred in post_preds
-    plot!(plt, wks, pred, lab="", color=:grey, alpha=0.3)
+    plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
 end
-scatter!(plt, wks, mpxv_wkly, lab="Data")
+scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"])
 display(plt)
 
 
