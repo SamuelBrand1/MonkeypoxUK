@@ -14,14 +14,23 @@ N_msm = round(Int64, N_uk * prop_ovr18 * prop_msm * prop_sexual_active) #~1.5m
 # with the 5th percentile of 4.2 days and the 95th percentile of 17.3 days (Table 2)
 
 d_incubation = Gamma(6.77, 1 / 0.77)#Fit from rerunning 
+# d_incubation = LogNormal(2.09, 0.46)
 # d_incubation = Gamma(7, 1.25)
 negbin_std = fill(0.0, 8)
 for r = 1:8
     p = r / mean(d_incubation)
     negbin_std[r] = std(NegativeBinomial(r, p))
 end
-bar(negbin_std)
-hline!([std(d_incubation)])
+plt_incfit = bar(negbin_std,
+    title = "Discrete time model vs data-driven model for incubation",
+    lab = "",
+    xticks = 1:8,
+    xlabel = "Number of stages",
+    ylabel = "Std. incubation (days)",
+    size = (800,600),left_margin = 5mm)
+hline!(plt_incfit,[std(d_incubation)],lab = "std. data-driven model")
+display(plt_incfit)
+savefig(plt_incfit,"plots/incubation_fit.png")
 #Optimal choice is 4 stages with effective rate to match the mean
 p_incubation = 4 / mean(d_incubation)
 α_incubation_eff = -log(1 - p_incubation)
