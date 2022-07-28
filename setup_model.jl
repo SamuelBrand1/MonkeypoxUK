@@ -212,18 +212,17 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     #Get constant data
     N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
     #Get parameters and make transformations
-    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red = params
+    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
     p_γ = 1 / (1 + mean_inf_period)
     γ_eff = -log(1-p_γ) #get recovery rate
     # M = (1/ρ) + 1 #effective sample size for Beta-Binomial
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
-    vac_shape_arry = zeros(size(u0_msm))
 
     #Simulate and track error
     L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[3:end-1])
+    total_cases = sum(wkly_cases[3:end-1,:])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
         u_mpx, (ts[1], ts[end]),
@@ -232,22 +231,21 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     old_recs = [0, 0]
     new_recs = [0, 0]
     wk_num = 1
-    detected_cases = zeros(length(wkly_cases))
+    detected_cases = zeros(size(wkly_cases))
     not_changed = true
 
-    while wk_num <= length(wkly_cases) #Step forward a week
+    while wk_num <= size(wkly_cases, 1) 
         if not_changed && mpx_init.t > chp_t ##Change point for transmission
             not_changed = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
+            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission per sexual contact after the change point
+            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce transmission per non-sexual contact after the change point
         end
-        step!(mpx_init, 7)
+        step!(mpx_init, 7)#Step forward a week
         new_recs = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-        # detected_cases[wk_num] = (sum(new_recs) - sum(old_recs))*p_detect
         actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_recs[2] - old_recs[2], p_detect * M, (1 - p_detect) * M))]
-        detected_cases[wk_num] = Float64.(sum(actual_obs))
+        detected_cases[wk_num,:] .= actual_obs
         if wk_num > 3 && wk_num < length(wkly_cases) # Only compare on weeks 3 --- (end-1)
-            # L1_rel_err += sum(abs,p_detect.*(new_recs .- old_recs) .- wkly_cases[wk_num].*[0.99,0.01])/total_cases
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num] .* [0.99, 0.01]) / total_cases
+            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num,:]) / total_cases
         end
         wk_num += 1
         old_recs = new_recs

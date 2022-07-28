@@ -3,7 +3,7 @@
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
-using JLD2, MLUtils
+using JLD2, MLUtils, Roots
 
 ## Grab UK data
 
@@ -11,12 +11,12 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##
-_p = [0.01, 0.5, 20, 0.2, 0.5,6,1.5,130,1.0]
+_p = [0.01, 0.5, 20, 0.2, 0.5,6,1.5,130,0.7,0.3]
 
 err, pred = mpx_sim_function_chp(_p, constants, mpxv_wkly)
 
-plt = plot(pred)
-scatter!(plt,mpxv_wkly)
+plt = plot(pred, color = [1 2])
+scatter!(plt,mpxv_wkly,color = [1 2])
 display(plt)
 print(err)
 
@@ -31,16 +31,18 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
                 Gamma(3, 10 / 3),#  M 6
                 LogNormal(0,1),#init_scale 7
                 Uniform(152,ts[end]),# chp_t 8
-                Beta(1.5,1.5)]#trans_red 9
+                Beta(1.5,1.5),#trans_red 9
+                Beta(1.5,1.5)]#trans_red_other 10
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
 prior_sims = map(θ -> mpx_sim_function_chp(θ,constants,mpxv_wkly),draws)
+
 ##Prior predictive checking - simulation
 prior_preds = [sim[2] for sim in prior_sims]
 plt = plot(;ylabel = "Weekly cases",
             title = "Prior predictive checking")
 for pred in prior_preds
-    plot!(plt,wks,pred,lab = "", color = :grey, alpha = 0.3)
+    plot!(plt,wks,pred,lab = "", color = [1 2], alpha = 0.3)
 end
 display(plt)
 savefig(plt,"plots/prior_predictive_checking_plot.png")
@@ -48,25 +50,27 @@ savefig(plt,"plots/prior_predictive_checking_plot.png")
 ## Model-based calibration of target tolerance
 min_mbc_errs = map(n -> minimum(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
 
-
-##
-err_hist = histogram(min_mbc_errs,norm = :pdf,nbins = 200,
+##Find target tolerance and plot error distribution
+target_perc = 0.25 #Where in error distribution to target tolerance
+ϵ_target = find_zero(x -> target_perc - sum(min_mbc_errs .< x)/length(min_mbc_errs),(0,2))
+err_hist = histogram(min_mbc_errs,norm = :pdf,nbins = 500,
             lab = "",
             title = "Sampled errors from simulations with exact parameters",
             xlabel = "L1 relative error",
+            xlims = (0,2),
             size = (700,400))
-vline!(err_hist,[0.7],lab = "5th percentile (rel. err. = 0.7)",lw = 3)
+vline!(err_hist,[0.2325],lab = "$(round(Int64,target_perc*100))th percentile (target err. = $(round(ϵ_target,digits = 3)))",lw = 3)
 display(err_hist)
 savefig(err_hist,"plots/mbc_error_calibration_plt.png")
 ##Run inference
 
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
-    9, # number of parameters
-    0.7, #target ϵ
+    10, # number of parameters
+    ϵ_target, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
-    ϵ1=100,
+    ϵ1=1000,
     convergence=0.05,
-    nparticles = 1000,
+    nparticles = 2000,
     α = 0.5,
     kernel=gaussiankernel,
     constants=constants,
@@ -75,10 +79,11 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("draws2_nrw.jld2",smc_cng_pnt)
+@save("smc_posterior_draws.jld2",smc_cng_pnt)
 
 
 ##posterior predictive checking - simulation
+
 post_preds = [part.other for part in smc_cng_pnt.particles]
 plt = plot(;ylabel = "Weekly cases",
             title = "Posterior predictive checking")
