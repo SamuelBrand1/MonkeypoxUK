@@ -14,7 +14,7 @@ include("setup_model.jl");
 # particles = smcs[1].particles
 # particles = [particles; smcs[2].particles]
 # param_draws = [part.params for part in particles]
-smc = load("smc_posterior_draws.jld2")["smc_cng_pnt"]
+smc = load("smc_posterior_draws_vs2.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
 params_no_red = map(θ -> [θ[1:(end-2)];0.0;0.0], param_draws)
 
