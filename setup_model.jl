@@ -23,15 +23,15 @@ for r = 1:8
     negbin_std[r] = std(NegativeBinomial(r, p))
 end
 plt_incfit = bar(negbin_std,
-    title = "Discrete time model vs data-driven model for incubation",
-    lab = "",
-    xticks = 1:8,
-    xlabel = "Number of stages",
-    ylabel = "Std. incubation (days)",
-    size = (800,600),left_margin = 5mm)
-hline!(plt_incfit,[std(d_incubation)],lab = "std. data-driven model")
+    title="Discrete time model vs data-driven model for incubation",
+    lab="",
+    xticks=1:8,
+    xlabel="Number of stages",
+    ylabel="Std. incubation (days)",
+    size=(800, 600), left_margin=5mm)
+hline!(plt_incfit, [std(d_incubation)], lab="std. data-driven model")
 display(plt_incfit)
-savefig(plt_incfit,"plots/incubation_fit.png")
+savefig(plt_incfit, "plots/incubation_fit.png")
 #Optimal choice is 4 stages with effective rate to match the mean
 p_incubation = 4 / mean(d_incubation)
 α_incubation_eff = -log(1 - p_incubation)
@@ -46,7 +46,6 @@ x_max = 3650.0
 X̄ = (α_scaling / (α_scaling - 1)) * (x_min^(1 - α_scaling) - x_max^(1 - α_scaling)) / (x_min^(-α_scaling) - x_max^(-α_scaling))
 
 #Calculation
-
 C = (x_min^(-α_scaling) - x_max^(-α_scaling)) * X̄ / n_grp * ((1 - α_scaling) / α_scaling)
 xs = zeros(n_grp + 1)
 xs[1] = x_min
@@ -56,14 +55,33 @@ end
 xs[end] = x_max
 
 #Percentages in each group
-
 ps = map(x -> (x_min^(-α_scaling) - x^(-α_scaling)) / (x_min^(-α_scaling) - x_max^(-α_scaling)), xs) |> diff
 
 #Mean daily contact rates within groups
-
 xs_pairs = [(xs[i], xs[i+1]) for i = 1:(length(xs)-1)]
 mean_daily_cnts = map(x -> (α_scaling / (α_scaling - 1)) * (x[1]^(1 - α_scaling) - x[2]^(1 - α_scaling)) / (x[1]^(-α_scaling) - x[2]^(-α_scaling)), xs_pairs) .|> x -> x / 365.25
 
+##Plot sexual contact groups
+plt_ps = bar(ps,
+    yscale=:log10,
+    title="Proportion MSM in each group",
+    xticks=1:10,
+    ylabel="Proportion",
+    xlabel="Sexual activity group",
+    lab="")
+plt_μs = bar(mean_daily_cnts,
+    yscale=:log10,
+    title="Mean daily contact rates in each group",
+    xticks=1:10,
+    ylabel="Proportion",
+    xlabel="Sexual activity group",
+    lab="")
+hline!(plt_μs,[1/31],lab = "Vac. threshold", lw = 3,legend = :topleft)    
+plt = plot(plt_ps, plt_μs,
+        size = (1000,400),
+        bottom_margin = 5mm,left_margin = 5mm)
+display(plt)
+savefig(plt,"plots/sexual_activity_groups.png")        
 ##
 
 function setup_initial_state(N_pop, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_states=7, n_cliques=50)
@@ -225,7 +243,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     #Get parameters and make transformations
     α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
     p_γ = 1 / (1 + mean_inf_period)
-    γ_eff = -log(1-p_γ) #get recovery rate
+    γ_eff = -log(1 - p_γ) #get recovery rate
 
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_cliques=n_cliques)
@@ -233,7 +251,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     #Simulate and track error
     L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[3:end-1,:])
+    total_cases = sum(wkly_cases[3:end-1, :])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
         u_mpx, (ts[1], ts[end]),
@@ -245,7 +263,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     detected_cases = zeros(size(wkly_cases))
     not_changed = true
 
-    while wk_num <= size(wkly_cases, 1) 
+    while wk_num <= size(wkly_cases, 1)
         if not_changed && mpx_init.t > chp_t ##Change point for transmission
             not_changed = false
             mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission per sexual contact after the change point
@@ -254,9 +272,9 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         step!(mpx_init, 7)#Step forward a week
         new_recs = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
         actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_recs[2] - old_recs[2], p_detect * M, (1 - p_detect) * M))]
-        detected_cases[wk_num,:] .= actual_obs
+        detected_cases[wk_num, :] .= actual_obs
         if wk_num > 3 && wk_num < length(wkly_cases) # Only compare on weeks 3 --- (end-1)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num,:]) / total_cases
+            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
         end
         wk_num += 1
         old_recs = new_recs
@@ -272,7 +290,7 @@ end
 function mpx_sim_function_interventions(params, constants, wkly_cases, interventions)
     #Get constant data
     N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
-    
+
     #Get intervention data
     chp_t2 = interventions.chp_t2
     wkly_vaccinations = interventions.wkly_vaccinations
@@ -284,18 +302,18 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     #Get parameters and make transformations
     α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
     p_γ = 1 / (1 + mean_inf_period)
-    γ_eff = -log(1-p_γ) #get recovery rate
+    γ_eff = -log(1 - p_γ) #get recovery rate
 
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale;n_states = 8, n_cliques=n_cliques)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, γ_eff, ps, init_scale; n_states=8, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
     #Simulate and track error
     L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[3:end-1,:])
+    total_cases = sum(wkly_cases[3:end-1, :])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-        u_mpx, (ts[1], ts[1] + 7 * size(wkly_cases,1)),
+        u_mpx, (ts[1], ts[1] + 7 * size(wkly_cases, 1)),
         [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
     old_recs = [0, 0]
@@ -310,7 +328,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     not_changed2 = true
 
 
-    while wk_num <= size(wkly_cases,1) #Step forward a week
+    while wk_num <= size(wkly_cases, 1) #Step forward a week
         #Change points
         if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
             not_changed = false
@@ -322,7 +340,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
             mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
             mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
             p_γ = 1 / (1 + (mean_inf_period * (1 - inf_duration_red)))
-            mpx_init.p[3] = -log(1-p_γ) #Reduce duration of transmission after the change point
+            mpx_init.p[3] = -log(1 - p_γ) #Reduce duration of transmission after the change point
         end
         #Step forward a week in time
         step!(mpx_init, 7)
@@ -340,10 +358,10 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         new_recs = [sum(mpx_init.u.x[1][7, :, :]), mpx_init.u.x[2][7]]
         new_sus = [sum(mpx_init.u.x[1][1, :, :]), mpx_init.u.x[2][1]]
         actual_obs = [rand(BetaBinomial(new_recs[1] - old_recs[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_recs[2] - old_recs[2], p_detect * M, (1 - p_detect) * M))]
-        detected_cases[wk_num,:] .= Float64.(actual_obs)
-        incidence[wk_num,:] = Float64.([old_sus[1] - new_sus[1] - sum(num_vaccines),old_sus[2] - new_sus[2]])
-        if wk_num > 3 && wk_num < size(wkly_cases,1) # Only compare on weeks 3 --- (end-1)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num,:]) / total_cases
+        detected_cases[wk_num, :] .= Float64.(actual_obs)
+        incidence[wk_num, :] = Float64.([old_sus[1] - new_sus[1] - sum(num_vaccines), old_sus[2] - new_sus[2]])
+        if wk_num > 3 && wk_num < size(wkly_cases, 1) # Only compare on weeks 3 --- (end-1)
+            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
         end
         #Move time forwards one week
         wk_num += 1
@@ -355,22 +373,22 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
 end
 
 function cred_intervals(preds)
-    median_pred = hcat([median([preds[n][wk,1] for n = 1:length(preds)]) for wk in 1:size(preds[1],1)],
-    [median([preds[n][wk,2] for n = 1:length(preds)]) for wk in 1:size(preds[1],1)])
+    median_pred = hcat([median([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
+        [median([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
     # median_pred_no_red = [median([preds_nored[n][wk] for n = 1:length(preds_nored)]) for wk in 1:size(preds[1],1)]
     # median_pred_interventions = [median([preds_interventions[n][wk] for n = 1:length(preds_interventions)]) for wk in 1:size(preds[1],1)]
 
-    lb_pred_25 = median_pred .- hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1],1)],
-                                    [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1],1)])
+    lb_pred_25 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)])
 
-    lb_pred_025 = median_pred .- hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1],1)],
-    [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1],1)])
+    lb_pred_025 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)])
 
-    ub_pred_25 = hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1],1)],
-                            [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1],1)]) .- median_pred
-    ub_pred_025 = hcat([quantile([preds[n][wk,1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1],1)],
-                            [quantile([preds[n][wk,2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1],1)]) .- median_pred
-    return (;median_pred,lb_pred_025,lb_pred_25,ub_pred_25,ub_pred_025)
+    ub_pred_25 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- median_pred
+    ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- median_pred
+    return (; median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
 end
 
 

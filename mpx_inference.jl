@@ -35,7 +35,7 @@ print(err)
 #     Beta(1.5, 1.5)]#trans_red_other 10
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(5, 5), #p_detect  2
-    truncated(Gamma(3,6/3),0,21), #mean_inf_period - 1  3
+    truncated(Gamma(3, 6 / 3), 0, 21), #mean_inf_period - 1  3
     Beta(1, 9), #p_trans  4
     LogNormal(log(0.75), 0.25), #R0_other 5
     Gamma(3, 10 / 3),#  M 6
