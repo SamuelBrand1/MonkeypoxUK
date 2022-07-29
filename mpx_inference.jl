@@ -23,16 +23,27 @@ print(err)
 ## Priors - chg point model
 
 # α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
+# prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
+#     Beta(5, 5), #p_detect  2
+#     Gamma(3, 6 / 3), #mean_inf_period - 1  3
+#     Beta(5, 45), #p_trans  4
+#     LogNormal(log(0.75), 0.25), #R0_other 5
+#     Gamma(3, 10 / 3),#  M 6
+#     LogNormal(0, 1),#init_scale 7
+#     Uniform(152, ts[end]),# chp_t 8
+#     Beta(1.5, 1.5),#trans_red 9
+#     Beta(1.5, 1.5)]#trans_red_other 10
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(5, 5), #p_detect  2
-    Gamma(3, 6 / 3), #mean_inf_period - 1  3
-    Beta(5, 45), #p_trans  4
+    truncated(Gamma(3,6/3),0,21), #mean_inf_period - 1  3
+    Beta(1, 9), #p_trans  4
     LogNormal(log(0.75), 0.25), #R0_other 5
     Gamma(3, 10 / 3),#  M 6
     LogNormal(0, 1),#init_scale 7
     Uniform(152, ts[end]),# chp_t 8
     Beta(1.5, 1.5),#trans_red 9
     Beta(1.5, 1.5)]#trans_red_other 10
+
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
 prior_sims = map(θ -> mpx_sim_function_chp(θ, constants, mpxv_wkly), draws)
@@ -80,7 +91,7 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("smc_posterior_draws.jld2", smc_cng_pnt)
+@save("smc_posterior_draws_vs2.jld2", smc_cng_pnt)
 
 
 ##posterior predictive checking - simulation
