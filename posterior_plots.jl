@@ -8,7 +8,7 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws and structure
-smc = load("smc_posterior_draws_vs2.jld2")["smc_cng_pnt"]
+smc = load("smc_posterior_draws_vs3_nrw.jld2")["smc_cng_pnt2"]
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
@@ -47,9 +47,9 @@ histogram(post_num_groups)
 plt_post = plot(chn,
     left_margin=5mm)
 
-for i = 1:10
-    plot!(plt_post[2*i], prior_tuple[i])
-end
+# for i = 1:10
+#     plot!(plt_post[2*i], prior_tuple[i])
+# end
 display(plt_post)
 savefig(plt_post, "plots/post_plots.png")
 
