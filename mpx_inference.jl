@@ -63,7 +63,7 @@ savefig(plt, "plots/prior_predictive_checking_plot.png")
 mbc_errs = map(n -> mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
 
 ##Find target tolerance and plot error distribution
-target_perc = 0.25 #Where in error distribution to target tolerance
+target_perc = 0.1 #Where in error distribution to target tolerance
 ϵ_target = find_zero(x -> target_perc - sum(mbc_errs .< x) / length(mbc_errs), (0, 2))
 err_hist = histogram(mbc_errs, norm=:pdf, nbins=500,
     lab="",
@@ -91,18 +91,34 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("smc_posterior_draws_vs2.jld2", smc_cng_pnt)
+@save("smc_posterior_draws_vs3.jld2", smc_cng_pnt)
 
+##Run inference
+setup_cng_pnt2 = ABCSMC(mpx_sim_function_chp, #simulation function
+    10, # number of parameters
+    0.1, #target ϵ
+    Prior(prior_vect_cng_pnt); #Prior for each of the parameters
+    ϵ1=1000,
+    convergence=0.05,
+    nparticles=2000,
+    α=0.5,
+    kernel=gaussiankernel,
+    constants=constants,
+    maxiterations=10^10)
 
+smc_cng_pnt2 = runabc(setup_cng_pnt2, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
+
+##
+@save("smc_posterior_draws_vs3_nrw.jld2", smc_cng_pnt2)
 ##posterior predictive checking - simulation
 
-post_preds = [part.other for part in smc_cng_pnt.particles]
+post_preds = [part.other for part in smc_cng_pnt2.particles]
 plt = plot(; ylabel="Weekly cases",
     title="Posterior predictive checking")
 for pred in post_preds
     plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
 end
-scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"])
+scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
 display(plt)
 
 
