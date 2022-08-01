@@ -75,10 +75,10 @@ plot!(plt, long_wks, cred_int.median_pred .+ 1, ribbon=(cred_int.lb_pred_25, cre
 plot!(plt, long_wks[11:end], cred_int_rwc.median_pred[11:end,:], lw=3,ls = :dash,
         color= [1 2] , fillalpha=0.3, lab="")
 
-scatter!(plt, wks[[1, 2, end]], mpxv_wkly[[1, 2, end],:].+1,
+scatter!(plt, [wks[end]], [mpxv_wkly[end,:].+1],
                 lab="", 
                 ms=6, color=[1 2],shape = :square)
-scatter!(plt, wks[3:(end-1)], mpxv_wkly[3:(end-1),:] .+ 1, 
+scatter!(plt, wks[1:(end-1)], mpxv_wkly[1:(end-1),:] .+ 1, 
                 lab=["Data: MSM" "Data: non-MSM"], 
                 ms=6, color=[1 2])
 
