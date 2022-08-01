@@ -23,24 +23,46 @@ params_no_red = map(θ -> [θ[1:(end-2)]; 0.0; 0.0], param_draws)
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
 
-preds_rwc = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], param_draws)
+# preds_rwc = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], param_draws)
 # preds_nored = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], params_no_red)
 ## Public health emergency effect forecasts
 
-wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 24)] * 1.5
-plt_vacs = scatter([wks[1] + Day(7 * (k-1)) for k = 1:size(wkly_vaccinations,1)],wkly_vaccinations,
-        title="Projected numbers of MPX vaccine doses given",
-        lab="",
+wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 12)] * 1.5
+plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)], wkly_vaccinations,
+        title="Projected weekly number of MPX vaccines doses",
+        lab="", color=:black, lw=3, yticks=0:1000:8000,
         ylabel="Number doses per week",
         size=(800, 600), left_margin=5mm,
-        guidefont = 14,tickfont = 11,titlefont = 18)
+        guidefont=16, tickfont=11, titlefont=18)
+display(plt_vacs)
+savefig(plt_vacs, "plots/vaccine_rollout.png")
+## Fit future change in risk based on  posterior for first change point with extra dispersion
+function mom_fit_beta(X, shrinkage)
+        x̄ = mean(X)
+        v̄ = var(X)
+        if v̄ < x̄ * (1 - x̄)
+                α̂ = ((x̄^2 * (1 - x̄) / v̄) - x̄) / shrinkage
+                β̂ = (((x̄ * (1 - x̄)^2) / v̄) - (1 - x̄)) / shrinkage
+                return Beta(α̂, β̂)
+        else
+                println("ERROR")
+                return nothing
+        end
+end
 
+trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1)
+trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1)
+
+
+# fit_mle(D, x)
 ##
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
 inf_duration_red = 0.0
-interventions_ensemble = [(trans_red2=rand(Beta(32 / 20, 68 / 20)),#Based on posterior for first change point with extra dispersion
-        vac_effectiveness=rand(Uniform(0.8, 0.9)),
-        trans_red_other2=rand(Beta(80 / 20, 20 / 20)),
+
+
+interventions_ensemble = [(trans_red2=rand(trans_red2_prior),
+        vac_effectiveness=rand(Uniform(0.7, 0.85)),
+        trans_red_other2=rand(trans_red_other2_prior),
         wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
 no_interventions_ensemble = [(trans_red2=0.0,#Based on posterior for first change point with extra dispersion
@@ -48,9 +70,21 @@ no_interventions_ensemble = [(trans_red2=0.0,#Based on posterior for first chang
         trans_red_other2=0.0,
         wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
+no_red_ensemble = [(trans_red2=0.0,#Based on posterior for first change point with extra dispersion
+        vac_effectiveness=rand(Uniform(0.7, 0.85)),
+        trans_red_other2=0.0,
+        wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+
+no_vac_ensemble = [(trans_red2=rand(trans_red2_prior),#Based on posterior for first change point with extra dispersion
+        vac_effectiveness=rand(Uniform(0.7, 0.85)),
+        trans_red_other2=rand(trans_red_other2_prior),
+        wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+
 
 preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, interventions_ensemble)
 preds_and_incidence_no_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, no_interventions_ensemble)
+preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, no_vac_ensemble)
+preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, no_red_ensemble)
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
