@@ -40,7 +40,7 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     LogNormal(log(0.75), 0.25), #R0_other 5
     Gamma(3, 10 / 3),#  M 6
     LogNormal(0, 1),#init_scale 7
-    Uniform(152, ts[end]),# chp_t 8
+    Uniform(152, 199),# chp_t 8
     Beta(1.5, 1.5),#trans_red 9
     Beta(1.5, 1.5)]#trans_red_other 10
 

@@ -8,7 +8,7 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws and structure
-smc = load("smc_posterior_draws_vs3_nrw.jld2")["smc_cng_pnt2"]
+smc = load("smc_posterior_draws_vs4.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
@@ -27,37 +27,67 @@ function col_transformations(X, f_vect)
     return X
 end
 
-val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i,j] for i = 1:size(X,1),j = 1:size(X,2), k = 1:1  ]
-prior_tuple = smc.setup.prior.distribution
+val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
 chn = Chains(val_mat, param_names)
 
-##
-sample_inf_periods = [1 + rand(Geometric(1 / (1 + μ))) for μ in [θ[3] for θ in param_draws]]
-μs = [1 + mean(Geometric(1 / (1 + μ))) for μ in [θ[3] for θ in param_draws]]
+write("posteriors/posterior_chain_" * string(Dates.today()) * ".jls", chn)
 
-num = [sum(sample_inf_periods .== n) for n = 1:maximum(sample_inf_periods)]
-bar(num ./ 2000,
-    xlims=(0, 30))
-## Transform to effective number of groups
-post_num_groups = map(α -> sum(rand(DirichletMultinomial(N_msm, α * ones(n_cliques))) .> 0), [θ[1] for θ in param_draws])
-histogram(post_num_groups)
-# histogram([θ[1] for θ in param_draws],norm = :pdf,fillalpha = 0.3)
-# histogram!(rand(prior_tuple[1],2000),norm = :pdf,fillalpha = 0.3)
 ##
-plt_post = plot(chn,
-    left_margin=5mm)
+prior_tuple = smc.setup.prior.distribution
+prior_val_mat = Matrix{Float64}(undef, 10_000, length(prior_tuple))
+for j = 1:length(prior_tuple)
+    prior_val_mat[:, j] .= rand(prior_tuple[j], 10_000)
+end
+prior_val_mat = col_transformations(prior_val_mat, transformations)
+##
+pretty_parameter_names = ["Clique size dispersion",
+    "Prob. of detection",
+    "Mean dur. infectious",
+    "Prob. trans. per sexual contact",
+    "Non-sexual R0",
+    "Prob. of detect. dispersion",
+    "Init. Infs scale",
+    "Timing: 1st change point",
+    "Sex. trans. reduction: 1st cng pnt",
+    "Other trans. reduction: 1st cng pnt"]
 
-# for i = 1:10
-#     plot!(plt_post[2*i], prior_tuple[i])
-# end
-display(plt_post)
-savefig(plt_post, "plots/post_plots.png")
+post_plt = plot(; layout=(5, 2),
+    size=(800, 2000), dpi=250)
+
+for j = 1:length(prior_tuple)
+    histogram!(post_plt[j], val_mat[:, j],
+        norm=:pdf,
+        fillalpha=0.5,
+        nbins=100,
+        lw=0.5,
+        alpha=0.1,
+        lab="",
+        color=1,
+        title=string(pretty_parameter_names[j]))
+    histogram!(post_plt[j], prior_val_mat[:, j],
+        norm=:pdf,
+        fillalpha=0.5,
+        alpha=0.1,
+        color=2,
+        nbins=100,
+        lab="")
+    density!(post_plt[j], val_mat[:, j],
+        lw=3,
+        color=1,
+        lab="Posterior")
+    density!(post_plt[j], prior_val_mat[:, j],
+        lw=3,
+        color=2,
+        lab="Prior")
+end
+display(post_plt)
+savefig(post_plt, "posteriors/post_plot" * string(today()) * ".png")
 
 ##
 crn_plt = corner(chn,
     size=(1500, 1500),
     left_margin=5mm, right_margin=5mm)
-savefig(crn_plt, "plots/post_crnplot.png")
+savefig(crn_plt, "posteriors/post_crnplot" * string(today()) * ".png")
 
 ##
 

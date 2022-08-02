@@ -14,9 +14,9 @@ include("setup_model.jl");
 # particles = smcs[1].particles
 # particles = [particles; smcs[2].particles]
 # param_draws = [part.params for part in particles]
-smc = load("smc_posterior_draws_vs3_nrw.jld2")["smc_cng_pnt2"]
+smc = load("smc_posterior_draws_vs4.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
-params_no_red = map(θ -> [θ[1:(end-2)]; 0.0; 0.0], param_draws)
+# params_no_red = map(θ -> [θ[1:(end-2)]; 0.0; 0.0], param_draws)
 
 ##Generate predictions with no change
 
@@ -53,24 +53,21 @@ end
 trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1)
 trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1)
 
-
-# fit_mle(D, x)
 ##
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
 inf_duration_red = 0.0
-
 
 interventions_ensemble = [(trans_red2=rand(trans_red2_prior),
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
         trans_red_other2=rand(trans_red_other2_prior),
         wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
-no_interventions_ensemble = [(trans_red2=0.0,#Based on posterior for first change point with extra dispersion
+no_interventions_ensemble = [(trans_red2=0.0,
         vac_effectiveness=0.0,
         trans_red_other2=0.0,
         wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
-no_red_ensemble = [(trans_red2=0.0,#Based on posterior for first change point with extra dispersion
+no_red_ensemble = [(trans_red2=0.0,
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
         trans_red_other2=0.0,
         wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
@@ -99,9 +96,11 @@ incidences = [x[2] for x in preds_and_incidence_interventions]
 cum_incidences = [cumsum(x[2], dims=1) for x in preds_and_incidence_interventions]
 cum_cases = [cumsum(x[1], dims=1) for x in preds_and_incidence_interventions]
 cum_cases_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_interventions]
+cum_cases_nointervention_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_interventions]
+cum_cases_novaccines_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_vaccines]
+cum_cases_noredtrans_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_redtrans]
 
 cum_cases_nointervention = [cumsum(x[1], dims=1) for x in preds_and_incidence_no_interventions]
-cum_cases_nointervention_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_interventions]
 cum_incidences_nointervention = [cumsum(x[2], dims=1) for x in preds_and_incidence_no_interventions]
 
 ##Simulation projections
@@ -111,63 +110,161 @@ cred_int_rwc = cred_intervals(preds_nointervention)
 cred_int_nv = cred_intervals(preds_novacs)
 cred_int_nr = cred_intervals(preds_noredtrans)
 
-
-plt = plot(; ylabel="Weekly cases",
-        title="UK Monkeypox Case Projections", yscale=:log10,
+## MSM projections
+plt_msm = plot(; ylabel="Weekly cases",
+        title="UK Monkeypox Case Projections (MSM)",# yscale=:log10,
         legend=:topleft,
-        yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
-        ylims=(0.8, 3001),
+        # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
+        # ylims=(0.8, 3001),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt, long_wks, cred_int.median_pred .+ 1, ribbon=(cred_int.lb_pred_025, cred_int.ub_pred_025), lw=0,
-        color=[1 2], fillalpha=0.3, lab=["Projection: MSM" "Projection: non-MSM"])
-plot!(plt, long_wks, cred_int.median_pred .+ 1, ribbon=(cred_int.lb_pred_25, cred_int.ub_pred_25), lw=3,
-        color=[1 2], fillalpha=0.3, lab="")
-plot!(plt, long_wks[11:end], cred_int_rwc.median_pred[11:end, :], lw=3, ls=:dash,
-        color=[1 2], fillalpha=0.3, lab="")
-plot!(plt, long_wks[11:end], cred_int_nv.median_pred[11:end, :], lw=3, ls=:dot,
-        color=[1 2], fillalpha=0.3, lab="")
-plot!(plt, long_wks[11:end], cred_int_n5.median_pred[11:end, :], lw=3, ls=:dashdot,
-        color=[1 2], fillalpha=0.3, lab="")
-
-
-scatter!(plt, wks[(end-1):end], mpxv_wkly[(end-1):end, :] .+ 1,
+plot!(plt_msm, long_wks, cred_int.median_pred[:, 1],
+        ribbon=(cred_int.lb_pred_25[:, 1], cred_int.ub_pred_25[:, 1]),
+        lw=3,
+        color=:black,
+        fillalpha=0.2,
+        lab="Forecast")
+plot!(plt_msm, long_wks[11:end], cred_int_nr.median_pred[11:end, 1],
+        ribbon=(cred_int_nr.lb_pred_25[11:end, 1], cred_int_nr.ub_pred_25[11:end, 1]),
+        lw=3,
+        ls=:dash,
+        color=1, fillalpha=0.2, lab="No further behavioural response")
+plot!(plt_msm, long_wks[11:end], cred_int_nv.median_pred[11:end, 1],
+        ribbon=(cred_int_nv.lb_pred_25[11:end, 1], cred_int_nv.ub_pred_25[11:end, 1]),
+        lw=3,
+        ls=:dash,
+        color=4, fillalpha=0.2, lab="No vaccinations")
+plot!(plt_msm, long_wks[11:end], cred_int_rwc.median_pred[11:end, 1],
+        ribbon=(cred_int_rwc.lb_pred_25[11:end, 1], cred_int_rwc.ub_pred_25[11:end, 1]),
+        lw=3,
+        ls=:dash,
+        color=2, fillalpha=0.2, lab="Reasonable worst case scenario")
+scatter!(plt_msm, wks[(end):end], mpxv_wkly[(end):end, 1],
         lab="",
-        ms=6, color=[1 2], shape=:square)
-scatter!(plt, wks[1:(end-2)], mpxv_wkly[1:(end-2), :] .+ 1,
-        lab=["Data: MSM" "Data: non-MSM"],
-        ms=6, color=[1 2])
+        ms=6, color=:black, shape=:square)
+scatter!(plt_msm, wks[1:(end-1)], mpxv_wkly[1:(end-1), 1],
+        lab="Data",
+        ms=6, color=:black)
 
-display(plt)
-savefig(plt, "plots/case_projections.png")
+##
+plt_nmsm = plot(; ylabel="Weekly cases",
+        title="UK Monkeypox Case Projections (non-MSM)",# yscale=:log10,
+        legend=:topleft,
+        # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
+        # ylims=(0.8, 3001),
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=18, guidefont=18, legendfont=11)
+plot!(plt_nmsm, long_wks, cred_int.median_pred[:, 2],
+        ribbon=(cred_int.lb_pred_25[:, 2], cred_int.ub_pred_25[:, 2]),
+        lw=3,
+        color=:black,
+        fillalpha=0.2,
+        lab="Forecast")
+plot!(plt_nmsm, long_wks[11:end], cred_int_nr.median_pred[11:end, 2],
+        ribbon=(cred_int_nr.lb_pred_25[11:end, 2], cred_int_nr.ub_pred_25[11:end, 2]),
+        lw=3,
+        ls=:dash,
+        color=1, fillalpha=0.2, lab="No further behavioural response")
+plot!(plt_nmsm, long_wks[11:end], cred_int_nv.median_pred[11:end, 2],
+        ribbon=(cred_int_nv.lb_pred_25[11:end, 2], cred_int_nv.ub_pred_25[11:end, 2]),
+        lw=3,
+        ls=:dash,
+        color=4, fillalpha=0.2, lab="No vaccinations")
+plot!(plt_nmsm, long_wks[11:end], cred_int_rwc.median_pred[11:end, 2],
+        ribbon=(cred_int_rwc.lb_pred_25[11:end, 2], cred_int_rwc.ub_pred_25[11:end, 2]),
+        lw=3,
+        ls=:dash,
+        color=2, fillalpha=0.2, lab="Reasonable worst case scenario")
+scatter!(plt_nmsm, wks[(end):end], mpxv_wkly[(end):end, 2],
+        lab="",
+        ms=6, color=:black, shape=:square)
+scatter!(plt_nmsm, wks[1:(end-1)], mpxv_wkly[1:(end-1), 2],
+        lab="Data",
+        ms=6, color=:black)
+
+
 
 ##cumulative Incidence plots
 # cred_int_cum_incidence = cred_intervals(cum_incidences)
 # cred_int_cum_incidence_no_intervention = cred_intervals(cum_incidences_nointervention)
 cred_int_cum_incidence = cred_intervals(cum_cases_forwards)
 cred_int_cum_incidence_no_intervention = cred_intervals(cum_cases_nointervention_forwards)
+cred_int_cum_no_vaccines = cred_intervals(cum_cases_novaccines_forwards)
+cred_int_cum_noredtrans = cred_intervals(cum_cases_noredtrans_forwards)
 
 
 total_cases = sum(mpxv_wkly, dims=1)
-plt = plot(; ylabel="Cumulative cases",
-        title="UK Monkeypox cumulative case projections",#yscale=:log10,
+plt_cm_msm = plot(; ylabel="Cumulative cases",
+        title="UK Monkeypox cumulative case projections (MSM)",#yscale=:log10,
         legend=:topleft,
         yticks=(0:2500:12500, 0:2500:12500),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt, long_wks[((d1+1)):end], total_cases .+ cred_int_cum_incidence.median_pred, ribbon=(cred_int_cum_incidence.lb_pred_025, cred_int_cum_incidence.ub_pred_025), lw=0,
-        color=[1 2], fillalpha=0.3, lab=["Projection: MSM" "Projection: non-MSM"])
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence.median_pred[:, 1],
+        ribbon=(cred_int_cum_incidence.lb_pred_25[:, 1], cred_int_cum_incidence.ub_pred_25[:, 1]),
+        lw=3,
+        color=:black, fillalpha=0.2, lab="Forecast")
 
-plot!(plt, long_wks[(d1+1):end], total_cases .+ cred_int_cum_incidence.median_pred, ribbon=(cred_int_cum_incidence.lb_pred_25, cred_int_cum_incidence.ub_pred_25), lw=3,
-        color=[1 2], fillalpha=0.3, lab="")
-plot!(plt, long_wks[(d1+1):end], total_cases .+ cred_int_cum_incidence_no_intervention.median_pred, lw=3, ls=:dash,
-        color=[1 2], fillalpha=0.3, lab="")
-scatter!(plt, wks, cumsum(mpxv_wkly, dims=1),
-        lab=["Data: MSM" "Data: non-MSM"],
-        ms=6, color=[1 2])
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_noredtrans.median_pred[:, 1],
+        ribbon=(cred_int_cum_noredtrans.lb_pred_25[:, 1], cred_int_cum_noredtrans.ub_pred_25[:, 1]),
+        lw=3, ls=:dash,
+        color=1, fillalpha=0.2, lab="No further behavioural response")
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_no_vaccines.median_pred[:, 1],
+        ribbon=(cred_int_cum_no_vaccines.lb_pred_25[:, 1], cred_int_cum_no_vaccines.ub_pred_25[:, 1]),
+        lw=3, ls=:dash,
+        color=4, fillalpha=0.2, lab="No vaccinations")
 
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence_no_intervention.median_pred[:, 1],
+        ribbon=(cred_int_cum_incidence_no_intervention.lb_pred_25[:, 1], cred_int_cum_incidence_no_intervention.ub_pred_25[:, 1]),
+        lw=3, ls=:dash,
+        color=2, fillalpha=0.2, lab="Reasonable worst case scenario")
+
+scatter!(plt_cm_msm, wks, cumsum(mpxv_wkly[:, 1], dims=1),
+        lab="Data",
+        ms=6, color=:black)
+
+##
+total_cases = sum(mpxv_wkly, dims=1)
+plt_cm_nmsm = plot(; ylabel="Cumulative cases",
+        title="UK Monkeypox cumulative case projections (non-MSM)",#yscale=:log10,
+        legend=:topleft,
+        # yticks=(0:2500:12500, 0:2500:12500),
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=17, guidefont=18, legendfont=11)
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence.median_pred[:, 2],
+        ribbon=(cred_int_cum_incidence.lb_pred_25[:, 2], cred_int_cum_incidence.ub_pred_25[:, 2]),
+        lw=3,
+        color=:black, fillalpha=0.2, lab="Forecast")
+
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_noredtrans.median_pred[:, 2],
+        ribbon=(cred_int_cum_noredtrans.lb_pred_25[:, 2], cred_int_cum_noredtrans.ub_pred_25[:, 2]),
+        lw=3, ls=:dash,
+        color=1, fillalpha=0.2, lab="No further behavioural response")
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_no_vaccines.median_pred[:, 2],
+        ribbon=(cred_int_cum_no_vaccines.lb_pred_25[:, 2], cred_int_cum_no_vaccines.ub_pred_25[:, 2]),
+        lw=3, ls=:dash,
+        color=4, fillalpha=0.2, lab="No vaccinations")
+
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence_no_intervention.median_pred[:, 2],
+        ribbon=(cred_int_cum_incidence_no_intervention.lb_pred_25[:, 2], cred_int_cum_incidence_no_intervention.ub_pred_25[:, 2]),
+        lw=3, ls=:dash,
+        color=2, fillalpha=0.2, lab="Reasonable worst case scenario")
+
+scatter!(plt_cm_nmsm, wks, cumsum(mpxv_wkly[:, 2], dims=1),
+        lab="Data",
+        ms=6, color=:black)
+
+##Combined plot
+lo = @layout [a b;c d]
+plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
+        size=(1600, 1200), dpi=250,
+        left_margin=10mm,
+        bottom_margin=10mm,
+        right_margin=10mm,
+        layout=lo)
 display(plt)
-savefig(plt, "plots/cumcaseprojections.png")
-                
+savefig(plt, "plots/case_projections.png")
