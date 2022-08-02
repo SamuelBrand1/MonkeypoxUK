@@ -260,7 +260,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     #Simulate and track error
     L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[3:end-1, :])
+    total_cases = sum(wkly_cases[1:(end-1), :])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
                             u_mpx, (ts[1] - 7, ts[end] - 7),#Step back a week due to lagged reporting

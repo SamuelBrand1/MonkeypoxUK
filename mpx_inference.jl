@@ -63,7 +63,7 @@ savefig(plt, "plots/prior_predictive_checking_plot.png")
 mbc_errs = map(n -> mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
 
 ##Find target tolerance and plot error distribution
-target_perc = 0.1 #Where in error distribution to target tolerance
+target_perc = 0.05 #Where in error distribution to target tolerance
 ϵ_target = find_zero(x -> target_perc - sum(mbc_errs .< x) / length(mbc_errs), (0, 2))
 err_hist = histogram(mbc_errs, norm=:pdf, nbins=500,
     lab="",
@@ -91,9 +91,10 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("smc_posterior_draws_vs3.jld2", smc_cng_pnt)
+@save("smc_posterior_draws_vs4.jld2", smc_cng_pnt)
 
 ##Run inference
+
 setup_cng_pnt2 = ABCSMC(mpx_sim_function_chp, #simulation function
     10, # number of parameters
     0.1, #target ϵ
