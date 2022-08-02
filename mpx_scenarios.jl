@@ -78,7 +78,7 @@ no_red_ensemble = [(trans_red2=0.0,#Based on posterior for first change point wi
 no_vac_ensemble = [(trans_red2=rand(trans_red2_prior),#Based on posterior for first change point with extra dispersion
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
         trans_red_other2=rand(trans_red_other2_prior),
-        wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+        wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
 
 preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, interventions_ensemble)
@@ -90,6 +90,11 @@ preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_int
 d1, d2 = size(mpxv_wkly)
 
 preds = [x[1] for x in preds_and_incidence_interventions]
+preds_nointervention = [x[1] for x in preds_and_incidence_no_interventions]
+preds_novacs = [x[1] for x in preds_and_incidence_no_vaccines]
+preds_noredtrans = [x[1] for x in preds_and_incidence_no_redtrans]
+
+
 incidences = [x[2] for x in preds_and_incidence_interventions]
 cum_incidences = [cumsum(x[2], dims=1) for x in preds_and_incidence_interventions]
 cum_cases = [cumsum(x[1], dims=1) for x in preds_and_incidence_interventions]
@@ -102,7 +107,10 @@ cum_incidences_nointervention = [cumsum(x[2], dims=1) for x in preds_and_inciden
 ##Simulation projections
 
 cred_int = cred_intervals(preds)
-cred_int_rwc = cred_intervals(preds_rwc)
+cred_int_rwc = cred_intervals(preds_nointervention)
+cred_int_nv = cred_intervals(preds_novacs)
+cred_int_nr = cred_intervals(preds_noredtrans)
+
 
 plt = plot(; ylabel="Weekly cases",
         title="UK Monkeypox Case Projections", yscale=:log10,
@@ -118,6 +126,11 @@ plot!(plt, long_wks, cred_int.median_pred .+ 1, ribbon=(cred_int.lb_pred_25, cre
         color=[1 2], fillalpha=0.3, lab="")
 plot!(plt, long_wks[11:end], cred_int_rwc.median_pred[11:end, :], lw=3, ls=:dash,
         color=[1 2], fillalpha=0.3, lab="")
+plot!(plt, long_wks[11:end], cred_int_nv.median_pred[11:end, :], lw=3, ls=:dot,
+        color=[1 2], fillalpha=0.3, lab="")
+plot!(plt, long_wks[11:end], cred_int_n5.median_pred[11:end, :], lw=3, ls=:dashdot,
+        color=[1 2], fillalpha=0.3, lab="")
+
 
 scatter!(plt, wks[(end-1):end], mpxv_wkly[(end-1):end, :] .+ 1,
         lab="",
