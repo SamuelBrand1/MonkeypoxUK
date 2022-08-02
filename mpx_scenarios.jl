@@ -9,24 +9,12 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws
-# filenames = ["draws1_nrw.jld2", "draws2_nrw.jld2"]
-# smcs = [load(filename)["smc_cng_pnt"] for filename in filenames];
-# particles = smcs[1].particles
-# particles = [particles; smcs[2].particles]
-# param_draws = [part.params for part in particles]
 smc = load("smc_posterior_draws_vs4.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
-# params_no_red = map(θ -> [θ[1:(end-2)]; 0.0; 0.0], param_draws)
 
-##Generate predictions with no change
-
+## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
-
-# preds_rwc = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], param_draws)
-# preds_nored = map(θ -> mpx_sim_function_chp(θ, constants, long_mpxv_wkly)[2], params_no_red)
-## Public health emergency effect forecasts
-
 wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 12)] * 1.5
 plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)], wkly_vaccinations,
         title="Projected weekly number of MPX vaccines doses",
@@ -36,6 +24,7 @@ plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)]
         guidefont=16, tickfont=11, titlefont=18)
 display(plt_vacs)
 savefig(plt_vacs, "plots/vaccine_rollout.png")
+
 ## Fit future change in risk based on  posterior for first change point with extra dispersion
 function mom_fit_beta(X, shrinkage)
         x̄ = mean(X)
@@ -49,7 +38,6 @@ function mom_fit_beta(X, shrinkage)
                 return nothing
         end
 end
-
 trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1)
 trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1)
 
@@ -78,10 +66,10 @@ no_vac_ensemble = [(trans_red2=rand(trans_red2_prior),#Based on posterior for fi
         wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
 
 
-preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, interventions_ensemble)
-preds_and_incidence_no_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, no_interventions_ensemble)
-preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, no_vac_ensemble)
-preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:3], param_draws, no_red_ensemble)
+preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, interventions_ensemble)
+preds_and_incidence_no_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_interventions_ensemble)
+preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_vac_ensemble)
+preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_red_ensemble)
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
@@ -258,8 +246,8 @@ scatter!(plt_cm_nmsm, wks, cumsum(mpxv_wkly[:, 2], dims=1),
         lab="Data",
         ms=6, color=:black)
 
-##Combined plot
-lo = @layout [a b;c d]
+##Combined plot for cases
+lo = @layout [a b; c d]
 plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
         size=(1600, 1200), dpi=250,
         left_margin=10mm,
@@ -268,3 +256,94 @@ plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
         layout=lo)
 display(plt)
 savefig(plt, "plots/case_projections.png")
+
+## Change in transmission over time
+interventions_ensemble[1]
+prob_trans = [θ[4] for θ in param_draws]
+red_sx_trans = [θ[9] for θ in param_draws]
+chp1 = [θ[8] for θ in param_draws]
+red_sx_trans2 = [int.trans_red2 for int in interventions_ensemble]
+
+
+function generate_sx_trans_risk_over_time(p_trans, trans_red, trans_red2, chp, chp2, ts)
+        log_p = [log(p_trans) + log(trans_red) * (t >= chp) + log(trans_red2) * (t >= chp2) for t in ts]
+        return exp.(log_p)
+end
+ts_risk = 1:365
+p_sx_trans_risks = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_sx_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, chp_t2, ts_risk),
+        prob_trans, red_sx_trans, red_sx_trans2, chp1) .|> x -> reshape(x, length(x), 1)
+p_sx_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_sx_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, Inf, ts_risk),
+        prob_trans, red_sx_trans, red_sx_trans2, chp1) .|> x -> reshape(x, length(x), 1)
+
+sx_trans_risk_cred_int = prev_cred_intervals(p_sx_trans_risks)
+sx_trans_risk_cred_no_int = prev_cred_intervals(p_sx_trans_risks_rwc)
+plot(sx_trans_risk_cred_int.median_pred,
+        ribbon=(sx_trans_risk_cred_int.lb_pred_25, sx_trans_risk_cred_int.ub_pred_25))
+plot!(sx_trans_risk_cred_no_int.median_pred,
+        ribbon=(sx_trans_risk_cred_no_int.lb_pred_25, sx_trans_risk_cred_no_int.ub_pred_25))
+
+##Prevalence plots
+prev_cred_int = prev_cred_intervals([pred[3] for pred in preds_and_incidence_interventions])
+prev_cred_no_int = prev_cred_intervals([pred[3] for pred in preds_and_incidence_no_interventions])
+prev_cred_int_overall = prev_cred_intervals([sum(pred[3][:, 1:10], dims=2) for pred in preds_and_incidence_interventions])
+prev_cred_no_int_overall = prev_cred_intervals([sum(pred[3][:, 1:10], dims=2) for pred in preds_and_incidence_no_interventions])
+
+
+N_msm_grp = N_msm .* ps'
+_wks = long_wks .- Day(7)
+plt_prev = plot(_wks, prev_cred_int.median_pred[:, 1:10] ./ N_msm_grp,
+        ribbon=(prev_cred_int.lb_pred_25[:, 1:10] ./ N_msm_grp, prev_cred_int.ub_pred_25[:, 1:10] ./ N_msm_grp),
+        lw=[j / 1.5 for i = 1:1, j = 1:10],
+        lab=hcat(["Forecast"], fill("", 1, 9)),
+        yticks=(0:0.02:0.12, [string(y * 100) * "%" for y in 0:0.02:0.12]),
+        ylabel="MPX Prevalence",
+        title="MPX prevalence (MSM)",
+        color=:black,
+        fillalpha=0.1,
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=18, guidefont=18, legendfont=11)
+# histogram!(
+#         randn(1000),
+#         inset=(1, bbox(0.05, 0.05, 0.5, 0.25, :bottom, :right)),
+#         ticks=nothing,
+#         subplot=3,
+#         bg_inside=nothing
+# )
+plot!(_wks[11:end], prev_cred_no_int.median_pred[11:end, 1:10] ./ N_msm_grp,
+        lw=[j / 1.5 for i = 1:1, j = 1:10],
+        ls=:dash,
+        color=:black,
+        lab=hcat(["Worst case scenario"], fill("", 1, 9)))
+
+plot!(_wks, prev_cred_int_overall.median_pred ./ N_msm,
+        ribbon=(prev_cred_int_overall.lb_pred_25 ./ N_msm, prev_cred_int_overall.ub_pred_25 ./ N_msm),
+        lw=3,
+        color=:red,
+        fillalpha=0.1,
+        lab="",
+        xticks=[Date(2022, 6, 1), Date(2022, 8, 1), Date(2022, 10, 1)],
+        yticks=(0:0.001:0.0030, [string(y * 100) * "%" for y in 0:0.001:0.0030]),
+        inset=bbox(0.22, 0.125, 0.25, 0.25, :top, :left),
+        xtickfont=7,
+        subplot=2,
+        grid=nothing)
+plot!(_wks, prev_cred_no_int_overall.median_pred ./ N_msm,
+        subplot = 2,
+        color = :red,ls = :dash,lw = 3,lab = "")        
+
+
+
+
+## Mean sexual contacts of a detected person
+
+function sx_contacts_msm(pred, mean_daily_cnts)
+        sum(mean_daily_cnts' .* pred[:, 1:10] ./ (sum(pred[:, 1:10], dims=2) .+ 1e-10), dims=2) #Very slight perturbation to avoid NaN
+end
+
+observed_case_sx_cnt_rates = map(pred -> sx_contacts_msm(pred, mean_daily_cnts), [pred[3] for pred in preds_and_incidence_no_interventions])
+obs_case_sx_cnt_rates_pred = prev_cred_intervals(observed_case_sx_cnt_rates)
+
+plot(long_wks, obs_case_sx_cnt_rates_pred.median_pred,
+        ribbon=(obs_case_sx_cnt_rates_pred.lb_pred_25, obs_case_sx_cnt_rates_pred.ub_pred_25),
+        title="Case typical sexual contact rate")

@@ -52,7 +52,9 @@ pretty_parameter_names = ["Clique size dispersion",
     "Other trans. reduction: 1st cng pnt"]
 
 post_plt = plot(; layout=(5, 2),
-    size=(800, 2000), dpi=250)
+    size=(800, 2000), dpi=250,
+    left_margin=10mm,
+    right_margin=10mm)
 
 for j = 1:length(prior_tuple)
     histogram!(post_plt[j], val_mat[:, j],

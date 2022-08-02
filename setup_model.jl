@@ -316,7 +316,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     γ_eff = -log(1 - p_γ) #get recovery rate
 
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states = 9, n_cliques=n_cliques)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
     #Simulate and track error
@@ -324,7 +324,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     total_cases = sum(wkly_cases[1:end-1, :])
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-        u_mpx, (ts[1]-7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
+        u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
         [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
     old_onsets = [0, 0]
@@ -334,7 +334,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     wk_num = 1
     detected_cases = zeros(size(wkly_cases))
     incidence = zeros(size(wkly_cases))
-
+    prevalence = zeros(Int64, size(wkly_cases, 1), 11)
     not_changed = true
     not_changed2 = true
 
@@ -374,13 +374,15 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
         end
+        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][6, n, :]) for n = 1:10]; mpx_init.u.x[2][6]]
+
         #Move time forwards one week
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
     end
 
-    return L1_rel_err, detected_cases, incidence
+    return L1_rel_err, detected_cases, incidence, prevalence
 end
 
 function cred_intervals(preds)
@@ -399,6 +401,29 @@ function cred_intervals(preds)
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- median_pred
     ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- median_pred
+    return (; median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+end
+
+function prev_cred_intervals(preds)
+    d1, d2 = size(preds[1])
+    num = length(preds)
+    median_pred = Matrix{Float64}(undef, d1, d2)
+    lb_pred_25 = similar(median_pred)
+    lb_pred_025 = similar(median_pred)
+    ub_pred_25 = similar(median_pred)
+    ub_pred_025 = similar(median_pred)
+    for i = 1:d1, j = 1:d2
+        v = [preds[n][i, j] for n = 1:num]
+        median_pred[i, j] = median(v)
+        lb_pred_25[i, j] = quantile(v, 0.25)
+        lb_pred_025[i, j] = quantile(v, 0.025)
+        ub_pred_25[i, j] = quantile(v, 0.75)
+        ub_pred_025[i, j] = quantile(v, 0.975)
+    end
+    lb_pred_25 .= median_pred .- lb_pred_25
+    lb_pred_025 .= median_pred .- lb_pred_025
+    ub_pred_25 .= ub_pred_25 .- median_pred
+    ub_pred_025 .= ub_pred_025 .- median_pred
     return (; median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
 end
 
