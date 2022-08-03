@@ -371,7 +371,7 @@ plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
         lab="",
         xticks=[Date(2022, 6, 1), Date(2022, 8, 1), Date(2022, 10, 1)],
         yticks=(0:0.001:0.0030, [string(y * 100) * "%" for y in 0:0.001:0.0030]),
-        inset=bbox(0.22, 0.125, 0.25, 0.25, :top, :left),
+        inset=bbox(0.25, 0.125, 0.25, 0.25, :top, :left),
         xtickfont=7,
         subplot=2,
         grid=nothing,
@@ -396,7 +396,7 @@ plot!(plt_prev_overall, _wks, prev_cred_no_int.median_pred[:, 11] ./ N_uk,
         color=2, ls=:dash, lw=3, lab="Worst case scenario")
 ##
 plt = plot(plt_chng, plt_chng_oth,plt_prev, plt_prev_overall,
-        size=(1600, 1600), dpi=250,
+        size=(1750, 1600), dpi=250,
         left_margin=10mm,
         bottom_margin=10mm,
         right_margin=10mm,
@@ -417,7 +417,7 @@ end
 observed_case_sx_cnt_rates = map(pred -> sx_contacts_msm(pred, mean_daily_cnts), [pred[3] for pred in preds_and_incidence_no_interventions])
 obs_case_sx_cnt_rates_pred = prev_cred_intervals(observed_case_sx_cnt_rates)
 
-plot(long_wks, obs_case_sx_cnt_rates_pred.median_pred,
+plot(long_wks .- Week(1), obs_case_sx_cnt_rates_pred.median_pred,
         ribbon=(obs_case_sx_cnt_rates_pred.lb_pred_25, obs_case_sx_cnt_rates_pred.ub_pred_25),
         title="Typical sexual contact (cases)", fillalpha=0.2,
         lab="",

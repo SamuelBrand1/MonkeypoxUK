@@ -93,7 +93,7 @@ function setup_initial_state(N_pop, N_msm, α_choose, p_detect, α_incubation_ef
     end
     #Add infecteds so that expected detections on week 1 are 1
     choose_clique = rand(Categorical(normalize(N_clique, 1)))
-    av_infs = 5 * init_scale / (p_detect * (1 - exp(-α_incubation_eff))) #Set av number of infecteds across 5 categories of incubation and infectious rescaled by daily probability of detection if infectious
+    av_infs = 5 * init_scale / (p_detect * (1 - exp(-α_incubation_eff))) #Set av number of infecteds in each of 5 categories of incubation and infectious rescaled by daily probability of detection if infectious
     u0_msm[2:6, :, choose_clique] .= map(μ -> rand(Poisson(μ)), fill(av_infs / (5 * length(ps)), 5, length(ps)))
     u0_msm = u0_msm[:, :, N_clique.>0] #Reduce group size
     #Set up non MSM population
