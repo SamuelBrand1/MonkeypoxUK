@@ -9,7 +9,7 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws
-smc = load("smc_posterior_draws_vs4.jld2")["smc_cng_pnt"]
+smc = load("posteriors/smc_posterior_draws_2022-07-25.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
 
 ## Public health emergency effect forecasts
@@ -79,17 +79,10 @@ preds_nointervention = [x[1] for x in preds_and_incidence_no_interventions]
 preds_novacs = [x[1] for x in preds_and_incidence_no_vaccines]
 preds_noredtrans = [x[1] for x in preds_and_incidence_no_redtrans]
 
-
-incidences = [x[2] for x in preds_and_incidence_interventions]
-cum_incidences = [cumsum(x[2], dims=1) for x in preds_and_incidence_interventions]
-cum_cases = [cumsum(x[1], dims=1) for x in preds_and_incidence_interventions]
 cum_cases_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_interventions]
 cum_cases_nointervention_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_interventions]
 cum_cases_novaccines_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_vaccines]
 cum_cases_noredtrans_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_redtrans]
-
-cum_cases_nointervention = [cumsum(x[1], dims=1) for x in preds_and_incidence_no_interventions]
-cum_incidences_nointervention = [cumsum(x[2], dims=1) for x in preds_and_incidence_no_interventions]
 
 ##Simulation projections
 
@@ -255,34 +248,95 @@ plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
         right_margin=10mm,
         layout=lo)
 display(plt)
-savefig(plt, "plots/case_projections.png")
+savefig(plt, "plots/case_projections_" * string(wks[end]) * ".png")
 
 ## Change in transmission over time
-interventions_ensemble[1]
+
 prob_trans = [θ[4] for θ in param_draws]
 red_sx_trans = [θ[9] for θ in param_draws]
 chp1 = [θ[8] for θ in param_draws]
 red_sx_trans2 = [int.trans_red2 for int in interventions_ensemble]
 
-
-function generate_sx_trans_risk_over_time(p_trans, trans_red, trans_red2, chp, chp2, ts)
+function generate_trans_risk_over_time(p_trans, trans_red, trans_red2, chp, chp2, ts)
         log_p = [log(p_trans) + log(trans_red) * (t >= chp) + log(trans_red2) * (t >= chp2) for t in ts]
         return exp.(log_p)
 end
 ts_risk = 1:365
-p_sx_trans_risks = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_sx_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, chp_t2, ts_risk),
+p_sx_trans_risks = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, chp_t2, ts_risk),
         prob_trans, red_sx_trans, red_sx_trans2, chp1) .|> x -> reshape(x, length(x), 1)
-p_sx_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_sx_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, Inf, ts_risk),
+p_sx_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, Inf, ts_risk),
         prob_trans, red_sx_trans, red_sx_trans2, chp1) .|> x -> reshape(x, length(x), 1)
 
 sx_trans_risk_cred_int = prev_cred_intervals(p_sx_trans_risks)
 sx_trans_risk_cred_no_int = prev_cred_intervals(p_sx_trans_risks_rwc)
-plot(sx_trans_risk_cred_int.median_pred,
-        ribbon=(sx_trans_risk_cred_int.lb_pred_25, sx_trans_risk_cred_int.ub_pred_25))
-plot!(sx_trans_risk_cred_no_int.median_pred,
-        ribbon=(sx_trans_risk_cred_no_int.lb_pred_25, sx_trans_risk_cred_no_int.ub_pred_25))
+
+dates = [Date(2021, 12, 31) + Day(t) for t in ts_risk]
+f = findfirst(dates .== Date(2022, 7, 23))
+
+plt_chng = plot(dates, sx_trans_risk_cred_int.median_pred,
+        ribbon=(sx_trans_risk_cred_int.lb_pred_25, sx_trans_risk_cred_int.ub_pred_25),
+        lw=3, fillalpha=0.2,
+        lab="Transmission probability (forecast)",
+        title="Transmission probability (sexual contacts)",
+        ylabel="Prob. per sexual contact",
+        xlims=(long_wks[1] - Day(7), long_wks[end] - Day(7)),
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=17, guidefont=18, legendfont=11)
+
+plot!(plt_chng, dates[f:end], sx_trans_risk_cred_no_int.median_pred[f:end],
+        ribbon=(sx_trans_risk_cred_no_int.lb_pred_25[f:end], sx_trans_risk_cred_no_int.ub_pred_25[f:end]),
+        lw=3, fillalpha=0.3,
+        lab="Transmission probability (no change)")
+vline!(plt_chng, [Date(2022, 7, 23)],
+        lw=4, color=:black, ls=:dash,
+        lab="WHO declaration")
+##
+R0_other = [θ[5] for θ in param_draws]
+red_oth_trans = [θ[10] for θ in param_draws]
+chp1 = [θ[8] for θ in param_draws]
+red_oth_trans2 = [int.trans_red_other2 for int in interventions_ensemble]
+
+p_oth_trans_risks = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, chp_t2, ts_risk),
+        R0_other, red_oth_trans, red_oth_trans2, chp1) .|> x -> reshape(x, length(x), 1)
+p_oth_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, Inf, ts_risk),
+        R0_other, red_oth_trans, red_oth_trans2, chp1) .|> x -> reshape(x, length(x), 1)
+
+oth_sx_trans_risk_cred_int = prev_cred_intervals(p_oth_trans_risks)
+oth_trans_risk_cred_no_int = prev_cred_intervals(p_oth_trans_risks_rwc)
+
+plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.median_pred,
+        ribbon=(oth_sx_trans_risk_cred_int.lb_pred_25, oth_sx_trans_risk_cred_int.ub_pred_25),
+        lw=3, fillalpha=0.2,
+        lab="R0, non-sexual (forecast)",
+        title="Reproductive number (non-sexual contacts)",
+        ylabel="R(t) (non-sexual contacts)",
+        xlims=(long_wks[1] - Day(7), long_wks[end] - Day(7)),
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=17, guidefont=18, legendfont=11)
+
+plot!(plt_chng_oth, dates[f:end], oth_trans_risk_cred_no_int.median_pred[f:end],
+        ribbon=(oth_trans_risk_cred_no_int.lb_pred_25[f:end], oth_trans_risk_cred_no_int.ub_pred_25[f:end]),
+        lw=3, fillalpha=0.3,
+        lab="R0, non-sexual (no change)")
+vline!(plt_chng_oth, [Date(2022, 7, 23)],
+        lw=4, color=:black, ls=:dash,
+        lab="WHO declaration")
+## Combined plot
+
+plt = plot(plt_chng, plt_chng_oth,
+        size=(1600, 800), dpi=250,
+        left_margin=10mm,
+        bottom_margin=10mm,
+        right_margin=10mm,
+        layout=(1, 2))
+display(plt)
+savefig(plt, "plots/risk_over_time" * string(wks[end]) * ".png")
+
 
 ##Prevalence plots
+
 prev_cred_int = prev_cred_intervals([pred[3] for pred in preds_and_incidence_interventions])
 prev_cred_no_int = prev_cred_intervals([pred[3] for pred in preds_and_incidence_no_interventions])
 prev_cred_int_overall = prev_cred_intervals([sum(pred[3][:, 1:10], dims=2) for pred in preds_and_incidence_interventions])
@@ -297,26 +351,20 @@ plt_prev = plot(_wks, prev_cred_int.median_pred[:, 1:10] ./ N_msm_grp,
         lab=hcat(["Forecast"], fill("", 1, 9)),
         yticks=(0:0.02:0.12, [string(y * 100) * "%" for y in 0:0.02:0.12]),
         ylabel="MPX Prevalence",
-        title="MPX prevalence (MSM)",
+        title="MPX prevalence by sexual activity group (MSM)",
         color=:black,
         fillalpha=0.1,
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-# histogram!(
-#         randn(1000),
-#         inset=(1, bbox(0.05, 0.05, 0.5, 0.25, :bottom, :right)),
-#         ticks=nothing,
-#         subplot=3,
-#         bg_inside=nothing
-# )
-plot!(_wks[11:end], prev_cred_no_int.median_pred[11:end, 1:10] ./ N_msm_grp,
+
+plot!(plt_prev, _wks[11:end], prev_cred_no_int.median_pred[11:end, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         ls=:dash,
         color=:black,
         lab=hcat(["Worst case scenario"], fill("", 1, 9)))
 
-plot!(_wks, prev_cred_int_overall.median_pred ./ N_msm,
+plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
         ribbon=(prev_cred_int_overall.lb_pred_25 ./ N_msm, prev_cred_int_overall.ub_pred_25 ./ N_msm),
         lw=3,
         color=:red,
@@ -327,10 +375,11 @@ plot!(_wks, prev_cred_int_overall.median_pred ./ N_msm,
         inset=bbox(0.22, 0.125, 0.25, 0.25, :top, :left),
         xtickfont=7,
         subplot=2,
-        grid=nothing)
-plot!(_wks, prev_cred_no_int_overall.median_pred ./ N_msm,
-        subplot = 2,
-        color = :red,ls = :dash,lw = 3,lab = "")        
+        grid=nothing,
+        title="Overall")
+plot!(plt_prev, _wks, prev_cred_no_int_overall.median_pred ./ N_msm,
+        subplot=2,
+        color=:red, ls=:dash, lw=3, lab="")
 
 
 

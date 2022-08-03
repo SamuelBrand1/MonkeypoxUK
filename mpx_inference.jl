@@ -20,19 +20,8 @@ scatter!(plt, mpxv_wkly, color=[1 2])
 display(plt)
 print(err)
 
-## Priors - chg point model
+## Priors
 
-# α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale ,chp_t,trans_red
-# prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
-#     Beta(5, 5), #p_detect  2
-#     Gamma(3, 6 / 3), #mean_inf_period - 1  3
-#     Beta(5, 45), #p_trans  4
-#     LogNormal(log(0.75), 0.25), #R0_other 5
-#     Gamma(3, 10 / 3),#  M 6
-#     LogNormal(0, 1),#init_scale 7
-#     Uniform(152, ts[end]),# chp_t 8
-#     Beta(1.5, 1.5),#trans_red 9
-#     Beta(1.5, 1.5)]#trans_red_other 10
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(5, 5), #p_detect  2
     truncated(Gamma(3, 6 / 3), 0, 21), #mean_inf_period - 1  3
@@ -91,27 +80,10 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
 
 ##
-@save("smc_posterior_draws_vs4.jld2", smc_cng_pnt)
+@save("posteriors/smc_posterior_draws_"*string(wks[end])*".jld2", smc_cng_pnt)
 
-##Run inference
 
-setup_cng_pnt2 = ABCSMC(mpx_sim_function_chp, #simulation function
-    10, # number of parameters
-    0.1, #target ϵ
-    Prior(prior_vect_cng_pnt); #Prior for each of the parameters
-    ϵ1=1000,
-    convergence=0.05,
-    nparticles=2000,
-    α=0.5,
-    kernel=gaussiankernel,
-    constants=constants,
-    maxiterations=10^10)
-
-smc_cng_pnt2 = runabc(setup_cng_pnt2, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
-
-##
-@save("smc_posterior_draws_vs3_nrw.jld2", smc_cng_pnt2)
-##posterior predictive checking - simulation
+##posterior predictive checking - simple plot to see coherence of model with data
 
 post_preds = [part.other for part in smc_cng_pnt2.particles]
 plt = plot(; ylabel="Weekly cases",
