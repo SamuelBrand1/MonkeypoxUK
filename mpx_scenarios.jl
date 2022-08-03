@@ -350,7 +350,7 @@ plt_prev = plot(_wks, prev_cred_int.median_pred[:, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         lab=hcat(["Forecast"], fill("", 1, 9)),
         yticks=(0:0.02:0.12, [string(y * 100) * "%" for y in 0:0.02:0.12]),
-        ylabel="MPX Prevalence",
+        ylabel="Prevalence",
         title="MPX prevalence by sexual activity group (MSM)",
         color=:black,
         fillalpha=0.1,
@@ -363,11 +363,10 @@ plot!(plt_prev, _wks[11:end], prev_cred_no_int.median_pred[11:end, 1:10] ./ N_ms
         ls=:dash,
         color=:black,
         lab=hcat(["Worst case scenario"], fill("", 1, 9)))
-
 plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
         ribbon=(prev_cred_int_overall.lb_pred_25 ./ N_msm, prev_cred_int_overall.ub_pred_25 ./ N_msm),
         lw=3,
-        color=:red,
+        color=1,
         fillalpha=0.1,
         lab="",
         xticks=[Date(2022, 6, 1), Date(2022, 8, 1), Date(2022, 10, 1)],
@@ -379,7 +378,32 @@ plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
         title="Overall")
 plot!(plt_prev, _wks, prev_cred_no_int_overall.median_pred ./ N_msm,
         subplot=2,
-        color=:red, ls=:dash, lw=3, lab="")
+        color=1, ls=:dash, lw=3, lab="")
+##
+plt_prev_overall = plot(_wks, prev_cred_int.median_pred[:, 11] ./ N_uk,
+        ribbon=(prev_cred_int.lb_pred_25[:, 11] ./ N_uk, prev_cred_int.ub_pred_25[:, 11] ./ N_uk),
+        lw=3,
+        lab="Forecast",
+        ylabel="Prevalence",
+        title="MPX Prevalence (non-MSM)",
+        color=2,
+        yticks=(0:5e-7:2.5e-6, [string(round(y * 100, digits=10)) * "%" for y in 0:5e-7:2.5e-6]),
+        fillalpha=0.2,
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=18, guidefont=18, legendfont=11)
+plot!(plt_prev_overall, _wks, prev_cred_no_int.median_pred[:, 11] ./ N_uk,
+        color=2, ls=:dash, lw=3, lab="Worst case scenario")
+##
+plt = plot(plt_chng, plt_chng_oth,plt_prev, plt_prev_overall,
+        size=(1600, 1600), dpi=250,
+        left_margin=10mm,
+        bottom_margin=10mm,
+        right_margin=10mm,
+        layout=(2, 2))
+display(plt)
+savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
+
 
 
 
@@ -395,4 +419,8 @@ obs_case_sx_cnt_rates_pred = prev_cred_intervals(observed_case_sx_cnt_rates)
 
 plot(long_wks, obs_case_sx_cnt_rates_pred.median_pred,
         ribbon=(obs_case_sx_cnt_rates_pred.lb_pred_25, obs_case_sx_cnt_rates_pred.ub_pred_25),
-        title="Case typical sexual contact rate")
+        title="Typical sexual contact (cases)", fillalpha=0.2,
+        lab="",
+        left_margin=5mm,
+        size=(800, 600), dpi=250,
+        tickfont=11, titlefont=18, guidefont=18, legendfont=11)

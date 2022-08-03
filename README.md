@@ -2,4 +2,4 @@
  Some code for monkeypox
 
 ### Latest case projections
-![](plots/case_projections.png)
+![](case_projections_2022-07-25.png)

@@ -73,7 +73,7 @@ plt_μs = bar(mean_daily_cnts,
     yscale=:log10,
     title="Mean daily contact rates in each group",
     xticks=1:10,
-    ylabel="Proportion",
+    ylabel="Rate (days)",
     xlabel="Sexual activity group",
     lab="")
 hline!(plt_μs,[1/31],lab = "Vac. threshold", lw = 3,legend = :topleft)    
