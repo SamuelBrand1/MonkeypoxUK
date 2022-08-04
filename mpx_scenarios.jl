@@ -258,7 +258,7 @@ chp1 = [θ[8] for θ in param_draws]
 red_sx_trans2 = [int.trans_red2 for int in interventions_ensemble]
 
 function generate_trans_risk_over_time(p_trans, trans_red, trans_red2, chp, chp2, ts)
-        log_p = [log(p_trans) + log(trans_red) * (t >= chp) + log(trans_red2) * (t >= chp2) for t in ts]
+        log_p = [log(p_trans) + log(1 - trans_red) * (t >= chp) + log(1 - trans_red2) * (t >= chp2) for t in ts]
         return exp.(log_p)
 end
 ts_risk = 1:365
@@ -403,10 +403,6 @@ plt = plot(plt_chng, plt_chng_oth,plt_prev, plt_prev_overall,
         layout=(2, 2))
 display(plt)
 savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
-
-
-
-
 
 ## Mean sexual contacts of a detected person
 

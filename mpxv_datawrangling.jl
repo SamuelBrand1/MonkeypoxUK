@@ -10,6 +10,10 @@ sum(ismissing.(UK_mpxv_data.Date_onset)) #2429
 idxs_confirmed = UK_mpxv_data.Status .== "confirmed"
 ##Create weekly report data
 # p/(1-p) = R ⟹ p = R(1-p) ⟹ p = R/(1+R)
+reported_msm_prop = [Date(2022,6,22) 0.96
+                        Date(2022,7,6) 0.962;
+                        Date(2022,7,19) 0.965]
+
 msm_ratio = 1.0 ./ [Inf, 0.00000000, 0.01351351, 0.02222222, 0.05769231, 0.04575163,
         0.01408451, 0.03296703, 0.03125000, 0.07575758, 0.06172840, 0.09677419] # Ratio estimates
 msm_freq = msm_ratio ./ (1 .+ msm_ratio) .|> x -> isnan(x) ? 1.0 : x
