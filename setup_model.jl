@@ -374,7 +374,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
         end
-        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][6, n, :]) for n = 1:10]; mpx_init.u.x[2][6]]
+        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][2:6, n, :]) for n = 1:10]; sum(mpx_init.u.x[2][2:6])]
 
         #Move time forwards one week
         wk_num += 1

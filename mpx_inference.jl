@@ -3,7 +3,7 @@
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
-using JLD2, MLUtils, Roots
+using JLD2, Roots
 
 ## Grab UK data
 

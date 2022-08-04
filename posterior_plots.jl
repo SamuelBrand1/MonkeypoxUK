@@ -1,14 +1,14 @@
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
-using JLD2, MLUtils, MCMCChains
+using JLD2, MCMCChains
 
 ## Grab UK data and setup model
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws and structure
-smc = load("smc_posterior_draws_vs4.jld2")["smc_cng_pnt"]
+smc = load("posteriors/smc_posterior_draws_2022-07-25.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
@@ -30,7 +30,7 @@ end
 val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
 chn = Chains(val_mat, param_names)
 
-write("posteriors/posterior_chain_" * string(Dates.today()) * ".jls", chn)
+write("posteriors/posterior_chain_" * string(wks[end]) * ".jls", chn)
 
 ##
 prior_tuple = smc.setup.prior.distribution
@@ -83,13 +83,13 @@ for j = 1:length(prior_tuple)
         lab="Prior")
 end
 display(post_plt)
-savefig(post_plt, "posteriors/post_plot" * string(today()) * ".png")
+savefig(post_plt, "posteriors/post_plot" * string(wks[end])  * ".png")
 
 ##
 crn_plt = corner(chn,
     size=(1500, 1500),
     left_margin=5mm, right_margin=5mm)
-savefig(crn_plt, "posteriors/post_crnplot" * string(today()) * ".png")
+savefig(crn_plt, "posteriors/post_crnplot" * string(wks[end]) * ".png")
 
 ##
 

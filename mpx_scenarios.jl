@@ -1,7 +1,7 @@
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
-using JLD2, MLUtils
+using JLD2
 
 ## Grab UK data and model set up
 
@@ -349,7 +349,7 @@ plt_prev = plot(_wks, prev_cred_int.median_pred[:, 1:10] ./ N_msm_grp,
         ribbon=(prev_cred_int.lb_pred_25[:, 1:10] ./ N_msm_grp, prev_cred_int.ub_pred_25[:, 1:10] ./ N_msm_grp),
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         lab=hcat(["Forecast"], fill("", 1, 9)),
-        yticks=(0:0.02:0.12, [string(y * 100) * "%" for y in 0:0.02:0.12]),
+        yticks=(0:0.02:0.18, [string(round(y * 100)) * "%" for y in 0:0.02:0.18]),
         ylabel="Prevalence",
         title="MPX prevalence by sexual activity group (MSM)",
         color=:black,
@@ -370,7 +370,7 @@ plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
         fillalpha=0.1,
         lab="",
         xticks=[Date(2022, 6, 1), Date(2022, 8, 1), Date(2022, 10, 1)],
-        yticks=(0:0.001:0.0030, [string(y * 100) * "%" for y in 0:0.001:0.0030]),
+        yticks=(0:0.001:0.0050, [string(y * 100) * "%" for y in 0:0.001:0.0050]),
         inset=bbox(0.25, 0.125, 0.25, 0.25, :top, :left),
         xtickfont=7,
         subplot=2,
@@ -380,19 +380,19 @@ plot!(plt_prev, _wks, prev_cred_no_int_overall.median_pred ./ N_msm,
         subplot=2,
         color=1, ls=:dash, lw=3, lab="")
 ##
-plt_prev_overall = plot(_wks, prev_cred_int.median_pred[:, 11] ./ N_uk,
-        ribbon=(prev_cred_int.lb_pred_25[:, 11] ./ N_uk, prev_cred_int.ub_pred_25[:, 11] ./ N_uk),
+plt_prev_overall = plot(_wks, prev_cred_int.median_pred[:, 11] ./ (N_uk - N_msm),
+        ribbon=(prev_cred_int.lb_pred_25[:, 11] ./ (N_uk - N_msm), prev_cred_int.ub_pred_25[:, 11] ./ (N_uk - N_msm)),
         lw=3,
         lab="Forecast",
         ylabel="Prevalence",
         title="MPX Prevalence (non-MSM)",
         color=2,
-        yticks=(0:5e-7:2.5e-6, [string(round(y * 100, digits=10)) * "%" for y in 0:5e-7:2.5e-6]),
+        yticks=(0:5e-7:4.0e-6, [string(round(y * 100, digits=10)) * "%" for y in 0:5e-7:4.0e-6]),
         fillalpha=0.2,
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt_prev_overall, _wks, prev_cred_no_int.median_pred[:, 11] ./ N_uk,
+plot!(plt_prev_overall, _wks[11:end], prev_cred_no_int.median_pred[11:end, 11] ./ (N_uk - N_msm),
         color=2, ls=:dash, lw=3, lab="Worst case scenario")
 ##
 plt = plot(plt_chng, plt_chng_oth,plt_prev, plt_prev_overall,
