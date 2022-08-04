@@ -9,13 +9,13 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws
-smc = load("posteriors/smc_posterior_draws_2022-07-25.jld2")["smc_cng_pnt"]
+smc = load("posteriors/smc_posterior_draws_2022-08-01.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
-wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 12)] * 1.5
+wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 13)] * 1.5
 plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)], wkly_vaccinations,
         title="Projected weekly number of MPX vaccines doses",
         lab="", color=:black, lw=3, yticks=0:1000:8000,

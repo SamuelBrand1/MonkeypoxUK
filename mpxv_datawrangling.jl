@@ -18,9 +18,12 @@ msm_ratio = 1.0 ./ [Inf, 0.00000000, 0.01351351, 0.02222222, 0.05769231, 0.04575
         0.01408451, 0.03296703, 0.03125000, 0.07575758, 0.06172840, 0.09677419] # Ratio estimates
 msm_freq = msm_ratio ./ (1 .+ msm_ratio) .|> x -> isnan(x) ? 1.0 : x
 msm_freq = [msm_freq; msm_freq[end, :]] # extend estimate
+# msm_freq = fill()
+##
+
 first_day_wk_reported = Dates.firstdayofweek.(UK_mpxv_data.Date_confirmation[idxs_confirmed])
 wks = sort(unique(first_day_wk_reported))
-mpxv_wkly = [sum(first_day_wk_reported .== wk) for wk in wks] .* [msm_freq 1.0 .- msm_freq]
+mpxv_wkly = [sum(first_day_wk_reported .== wk) for wk in wks] .* [fill(0.965,length(wks)) fill(1 - 0.965,length(wks))]
 
 #Plot data
 scatter(wks, mpxv_wkly, lab=["MSM" "non-MSM"],
