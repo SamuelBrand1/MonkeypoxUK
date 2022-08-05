@@ -87,6 +87,7 @@ cum_cases_nointervention_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x i
 cum_cases_novaccines_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_vaccines]
 cum_cases_noredtrans_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_no_redtrans]
 
+
 ##Simulation projections
 
 cred_int = cred_intervals(preds)
