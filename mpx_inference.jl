@@ -11,7 +11,7 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##
-_p = [0.01, 0.5, 20, 0.2, 0.5, 6, 1.5, 130, 0.7, 0.3]
+_p = [0.01, 0.5, 20, 0.2, 0.5, 6, 1.5, 130, 0.7, 0.3,0.5,0.5]
 
 err, pred = mpx_sim_function_chp(_p, constants, mpxv_wkly)
 
@@ -31,7 +31,9 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     LogNormal(0, 1),#init_scale 7
     Uniform(135, 199),# chp_t 8
     Beta(1.5, 1.5),#trans_red 9
-    Beta(1.5, 1.5)]#trans_red_other 10
+    Beta(1.5, 1.5),#trans_red_other 10
+    Beta(1, 4),#trans_red WHO  11
+    Beta(1, 4)]#trans_red_other WHO 12
 
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
@@ -66,7 +68,7 @@ savefig(err_hist, "plots/mbc_error_calibration_plt.png")
 
 ##Run inference
 setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
-    10, # number of parameters
+    12, # number of parameters
     ϵ_target, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=1000,

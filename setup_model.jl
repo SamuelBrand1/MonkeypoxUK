@@ -242,37 +242,38 @@ end
 ingroup = 0.99
 n_cliques = 50
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
-constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, α_incubation_eff, n_cliques]
+wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 13)] * 1.5
+constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, α_incubation_eff, n_cliques,wkly_vaccinations,0.8,204]
 
 
 function mpx_sim_function_chp(params, constants, wkly_cases)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques, wkly_vaccinations,vac_effectiveness,chp_t2= constants
 
     #Get parameters and make transformations
-    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
+    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other,scale_trans_red2,scale_red_other2 = params
     p_γ = 1 / (1 + mean_inf_period)
     γ_eff = -log(1 - p_γ) #get recovery rate
-
+    trans_red2 = trans_red*scale_trans_red2
+    trans_red_other2 = scale_trans_red2*scale_red_other2
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_cliques=n_cliques)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
     #Simulate and track error
     L1_rel_err = 0.0
     total_cases = sum(wkly_cases[1:(end-1), :])
     u_mpx = ArrayPartition(u0_msm, u0_other)
-    prob = DiscreteProblem((du, u, p, t) -> f_mpx(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-                            u_mpx, (ts[1] - 7, ts[end] - 7),#Step back a week due to lagged reporting
-                            [p_trans, R0_other, γ_eff, α_incubation])
-    mpx_init = init(prob, FunctionMap()) #Begins week 1
-    # old_recs = [0, 0]
-    # new_recs = [0, 0]
+    prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
+                        u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
+                        [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
+    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
     old_onsets = [0, 0]
     new_onsets = [0, 0]
     wk_num = 1
     detected_cases = zeros(size(wkly_cases))
     not_changed = true
+    not_changed2 = true
 
     while wk_num <= size(wkly_cases, 1)
         if not_changed && mpx_init.t > chp_t ##Change point for transmission
@@ -280,11 +281,27 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
             mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission per sexual contact after the change point
             mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce transmission per non-sexual contact after the change point
         end
+        if not_changed2 && mpx_init.t > chp_t2 ##2nd change point for transmission 
+            not_changed2 = false
+            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
+            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
+        end
         step!(mpx_init, 7)#Step forward a week
+
+        #Do vaccine uptake
+        nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
+        du_vac = deepcopy(mpx_init.u)
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
+        num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
+        du_vac.x[1][1, 3:end, :] .-= num_vaccines
+        du_vac.x[1][8, 3:end, :] .+= num_vaccines
+        set_u!(mpx_init, du_vac) #Change the state of the model
+
+        #Calculate actual recoveries and score errors
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
-        if  wk_num < size(wkly_cases,1) - 1 # Leave last week out for cross-validation and possible right censoring issues
+        if  wk_num < size(wkly_cases,1)  # Leave last week out for cross-validation and possible right censoring issues
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
         wk_num += 1
@@ -386,28 +403,31 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
 end
 
 function cred_intervals(preds)
+    mean_pred = hcat([mean([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
+    [mean([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
     median_pred = hcat([median([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
         [median([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
     # median_pred_no_red = [median([preds_nored[n][wk] for n = 1:length(preds_nored)]) for wk in 1:size(preds[1],1)]
     # median_pred_interventions = [median([preds_interventions[n][wk] for n = 1:length(preds_interventions)]) for wk in 1:size(preds[1],1)]
 
-    lb_pred_25 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
+    lb_pred_25 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)])
 
-    lb_pred_025 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
+    lb_pred_025 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)])
 
     ub_pred_25 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)],
-        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- median_pred
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- mean_pred
     ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
-        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- median_pred
-    return (; median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- mean_pred
+    return (; mean_pred,median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
 end
 
 function prev_cred_intervals(preds)
     d1, d2 = size(preds[1])
     num = length(preds)
     median_pred = Matrix{Float64}(undef, d1, d2)
+    mean_pred = similar(median_pred)
     lb_pred_25 = similar(median_pred)
     lb_pred_025 = similar(median_pred)
     ub_pred_25 = similar(median_pred)
@@ -415,16 +435,17 @@ function prev_cred_intervals(preds)
     for i = 1:d1, j = 1:d2
         v = [preds[n][i, j] for n = 1:num]
         median_pred[i, j] = median(v)
+        mean_pred[i,j] = mean(v)
         lb_pred_25[i, j] = quantile(v, 0.25)
         lb_pred_025[i, j] = quantile(v, 0.025)
         ub_pred_25[i, j] = quantile(v, 0.75)
         ub_pred_025[i, j] = quantile(v, 0.975)
     end
-    lb_pred_25 .= median_pred .- lb_pred_25
-    lb_pred_025 .= median_pred .- lb_pred_025
-    ub_pred_25 .= ub_pred_25 .- median_pred
-    ub_pred_025 .= ub_pred_025 .- median_pred
-    return (; median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+    lb_pred_25 .= mean_pred .- lb_pred_25
+    lb_pred_025 .= mean_pred .- lb_pred_025
+    ub_pred_25 .= ub_pred_25 .- mean_pred
+    ub_pred_025 .= ub_pred_025 .- mean_pred
+    return (; median_pred, mean_pred,lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
 end
 
 

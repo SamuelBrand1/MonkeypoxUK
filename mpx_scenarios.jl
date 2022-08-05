@@ -4,7 +4,6 @@ using OrdinaryDiffEq, ApproxBayes
 using JLD2
 
 ## Grab UK data and model set up
-
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
@@ -15,7 +14,8 @@ param_draws = [part.params for part in smc.particles]
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
-wkly_vaccinations = [zeros(11); 1000; 2000; fill(5000, 13)] * 1.5
+# wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 13)] * 1.5
+
 plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)], wkly_vaccinations,
         title="Projected weekly number of MPX vaccines doses",
         lab="", color=:black, lw=3, yticks=0:1000:8000,
@@ -47,25 +47,26 @@ trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1,0.5)
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
 inf_duration_red = 0.0
 
-interventions_ensemble = [(trans_red2=rand(trans_red2_prior),
+
+interventions_ensemble = [(trans_red2=θ[9]*θ[11],
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
-        trans_red_other2=rand(trans_red_other2_prior),
-        wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+        trans_red_other2 = θ[10]*θ[12],
+        wkly_vaccinations, chp_t2, inf_duration_red) for θ in param_draws]
 
 no_interventions_ensemble = [(trans_red2=0.0,
         vac_effectiveness=0.0,
         trans_red_other2=0.0,
-        wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+        wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for θ in param_draws]
 
 no_red_ensemble = [(trans_red2=0.0,
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
         trans_red_other2=0.0,
-        wkly_vaccinations, chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+        wkly_vaccinations, chp_t2, inf_duration_red) for θ in param_draws]
 
-no_vac_ensemble = [(trans_red2=rand(trans_red2_prior),#Based on posterior for first change point with extra dispersion
+no_vac_ensemble = [(trans_red2=θ[9]*θ[11],#Based on posterior for first change point with extra dispersion
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
-        trans_red_other2=rand(trans_red_other2_prior),
-        wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for i = 1:length(param_draws)]
+        trans_red_other2=θ[10]*θ[12],
+        wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for θ in param_draws]
 
 
 preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, interventions_ensemble)
@@ -102,23 +103,23 @@ plt_msm = plot(; ylabel="Weekly cases",
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt_msm, long_wks, cred_int.median_pred[:, 1],
+plot!(plt_msm, long_wks, cred_int.mean_pred[:, 1],
         ribbon=(cred_int.lb_pred_25[:, 1], cred_int.ub_pred_25[:, 1]),
         lw=3,
         color=:black,
         fillalpha=0.2,
         lab="Forecast")
-plot!(plt_msm, long_wks[11:end], cred_int_nr.median_pred[11:end, 1],
+plot!(plt_msm, long_wks[11:end], cred_int_nr.mean_pred[11:end, 1],
         ribbon=(cred_int_nr.lb_pred_25[11:end, 1], cred_int_nr.ub_pred_25[11:end, 1]),
         lw=3,
         ls=:dash,
         color=1, fillalpha=0.2, lab="No further behavioural response")
-plot!(plt_msm, long_wks[11:end], cred_int_nv.median_pred[11:end, 1],
+plot!(plt_msm, long_wks[11:end], cred_int_nv.mean_pred[11:end, 1],
         ribbon=(cred_int_nv.lb_pred_25[11:end, 1], cred_int_nv.ub_pred_25[11:end, 1]),
         lw=3,
         ls=:dash,
         color=4, fillalpha=0.2, lab="No vaccinations")
-plot!(plt_msm, long_wks[11:end], cred_int_rwc.median_pred[11:end, 1],
+plot!(plt_msm, long_wks[11:end], cred_int_rwc.mean_pred[11:end, 1],
         ribbon=(cred_int_rwc.lb_pred_25[11:end, 1], cred_int_rwc.ub_pred_25[11:end, 1]),
         lw=3,
         ls=:dash,
@@ -139,23 +140,23 @@ plt_nmsm = plot(; ylabel="Weekly cases",
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt_nmsm, long_wks, cred_int.median_pred[:, 2],
+plot!(plt_nmsm, long_wks, cred_int.mean_pred[:, 2],
         ribbon=(cred_int.lb_pred_25[:, 2], cred_int.ub_pred_25[:, 2]),
         lw=3,
         color=:black,
         fillalpha=0.2,
         lab="Forecast")
-plot!(plt_nmsm, long_wks[11:end], cred_int_nr.median_pred[11:end, 2],
+plot!(plt_nmsm, long_wks[11:end], cred_int_nr.mean_pred[11:end, 2],
         ribbon=(cred_int_nr.lb_pred_25[11:end, 2], cred_int_nr.ub_pred_25[11:end, 2]),
         lw=3,
         ls=:dash,
         color=1, fillalpha=0.2, lab="No further behavioural response")
-plot!(plt_nmsm, long_wks[11:end], cred_int_nv.median_pred[11:end, 2],
+plot!(plt_nmsm, long_wks[11:end], cred_int_nv.mean_pred[11:end, 2],
         ribbon=(cred_int_nv.lb_pred_25[11:end, 2], cred_int_nv.ub_pred_25[11:end, 2]),
         lw=3,
         ls=:dash,
         color=4, fillalpha=0.2, lab="No vaccinations")
-plot!(plt_nmsm, long_wks[11:end], cred_int_rwc.median_pred[11:end, 2],
+plot!(plt_nmsm, long_wks[11:end], cred_int_rwc.mean_pred[11:end, 2],
         ribbon=(cred_int_rwc.lb_pred_25[11:end, 2], cred_int_rwc.ub_pred_25[11:end, 2]),
         lw=3,
         ls=:dash,
@@ -186,21 +187,21 @@ plt_cm_msm = plot(; ylabel="Cumulative cases",
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence.median_pred[:, 1],
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence.mean_pred[:, 1],
         ribbon=(cred_int_cum_incidence.lb_pred_25[:, 1], cred_int_cum_incidence.ub_pred_25[:, 1]),
         lw=3,
         color=:black, fillalpha=0.2, lab="Forecast")
 
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_noredtrans.median_pred[:, 1],
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_noredtrans.mean_pred[:, 1],
         ribbon=(cred_int_cum_noredtrans.lb_pred_25[:, 1], cred_int_cum_noredtrans.ub_pred_25[:, 1]),
         lw=3, ls=:dash,
         color=1, fillalpha=0.2, lab="No further behavioural response")
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_no_vaccines.median_pred[:, 1],
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_no_vaccines.mean_pred[:, 1],
         ribbon=(cred_int_cum_no_vaccines.lb_pred_25[:, 1], cred_int_cum_no_vaccines.ub_pred_25[:, 1]),
         lw=3, ls=:dash,
         color=4, fillalpha=0.2, lab="No vaccinations")
 
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence_no_intervention.median_pred[:, 1],
+plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence_no_intervention.mean_pred[:, 1],
         ribbon=(cred_int_cum_incidence_no_intervention.lb_pred_25[:, 1], cred_int_cum_incidence_no_intervention.ub_pred_25[:, 1]),
         lw=3, ls=:dash,
         color=2, fillalpha=0.2, lab="Reasonable worst case scenario")
@@ -218,21 +219,21 @@ plt_cm_nmsm = plot(; ylabel="Cumulative cases",
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
-plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence.median_pred[:, 2],
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence.mean_pred[:, 2],
         ribbon=(cred_int_cum_incidence.lb_pred_25[:, 2], cred_int_cum_incidence.ub_pred_25[:, 2]),
         lw=3,
         color=:black, fillalpha=0.2, lab="Forecast")
 
-plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_noredtrans.median_pred[:, 2],
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_noredtrans.mean_pred[:, 2],
         ribbon=(cred_int_cum_noredtrans.lb_pred_25[:, 2], cred_int_cum_noredtrans.ub_pred_25[:, 2]),
         lw=3, ls=:dash,
         color=1, fillalpha=0.2, lab="No further behavioural response")
-plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_no_vaccines.median_pred[:, 2],
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_no_vaccines.mean_pred[:, 2],
         ribbon=(cred_int_cum_no_vaccines.lb_pred_25[:, 2], cred_int_cum_no_vaccines.ub_pred_25[:, 2]),
         lw=3, ls=:dash,
         color=4, fillalpha=0.2, lab="No vaccinations")
 
-plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence_no_intervention.median_pred[:, 2],
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence_no_intervention.mean_pred[:, 2],
         ribbon=(cred_int_cum_incidence_no_intervention.lb_pred_25[:, 2], cred_int_cum_incidence_no_intervention.ub_pred_25[:, 2]),
         lw=3, ls=:dash,
         color=2, fillalpha=0.2, lab="Reasonable worst case scenario")
@@ -275,7 +276,7 @@ sx_trans_risk_cred_no_int = prev_cred_intervals(p_sx_trans_risks_rwc)
 dates = [Date(2021, 12, 31) + Day(t) for t in ts_risk]
 f = findfirst(dates .== Date(2022, 7, 23))
 
-plt_chng = plot(dates, sx_trans_risk_cred_int.median_pred,
+plt_chng = plot(dates, sx_trans_risk_cred_int.mean_pred,
         ribbon=(sx_trans_risk_cred_int.lb_pred_25, sx_trans_risk_cred_int.ub_pred_25),
         lw=3, fillalpha=0.2,
         lab="Transmission probability (forecast)",
@@ -286,7 +287,7 @@ plt_chng = plot(dates, sx_trans_risk_cred_int.median_pred,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
 
-plot!(plt_chng, dates[f:end], sx_trans_risk_cred_no_int.median_pred[f:end],
+plot!(plt_chng, dates[f:end], sx_trans_risk_cred_no_int.mean_pred[f:end],
         ribbon=(sx_trans_risk_cred_no_int.lb_pred_25[f:end], sx_trans_risk_cred_no_int.ub_pred_25[f:end]),
         lw=3, fillalpha=0.3,
         lab="Transmission probability (no change)")
@@ -307,7 +308,7 @@ p_oth_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans
 oth_sx_trans_risk_cred_int = prev_cred_intervals(p_oth_trans_risks)
 oth_trans_risk_cred_no_int = prev_cred_intervals(p_oth_trans_risks_rwc)
 
-plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.median_pred,
+plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.mean_pred,
         ribbon=(oth_sx_trans_risk_cred_int.lb_pred_25, oth_sx_trans_risk_cred_int.ub_pred_25),
         lw=3, fillalpha=0.2,
         lab="R0, non-sexual (forecast)",
@@ -318,7 +319,7 @@ plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.median_pred,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
 
-plot!(plt_chng_oth, dates[f:end], oth_trans_risk_cred_no_int.median_pred[f:end],
+plot!(plt_chng_oth, dates[f:end], oth_trans_risk_cred_no_int.mean_pred[f:end],
         ribbon=(oth_trans_risk_cred_no_int.lb_pred_25[f:end], oth_trans_risk_cred_no_int.ub_pred_25[f:end]),
         lw=3, fillalpha=0.3,
         lab="R0, non-sexual (no change)")
@@ -347,7 +348,7 @@ prev_cred_no_int_overall = prev_cred_intervals([sum(pred[3][:, 1:10], dims=2) fo
 
 N_msm_grp = N_msm .* ps'
 _wks = long_wks .- Day(7)
-plt_prev = plot(_wks, prev_cred_int.median_pred[:, 1:10] ./ N_msm_grp,
+plt_prev = plot(_wks, prev_cred_int.mean_pred[:, 1:10] ./ N_msm_grp,
         ribbon=(prev_cred_int.lb_pred_25[:, 1:10] ./ N_msm_grp, prev_cred_int.ub_pred_25[:, 1:10] ./ N_msm_grp),
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         lab=hcat(["Forecast"], fill("", 1, 9)),
@@ -360,12 +361,12 @@ plt_prev = plot(_wks, prev_cred_int.median_pred[:, 1:10] ./ N_msm_grp,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
 
-plot!(plt_prev, _wks[11:end], prev_cred_no_int.median_pred[11:end, 1:10] ./ N_msm_grp,
+plot!(plt_prev, _wks[11:end], prev_cred_no_int.mean_pred[11:end, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         ls=:dash,
         color=:black,
         lab=hcat(["Worst case scenario"], fill("", 1, 9)))
-plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
+plot!(plt_prev, _wks, prev_cred_int_overall.mean_pred ./ N_msm,
         ribbon=(prev_cred_int_overall.lb_pred_25 ./ N_msm, prev_cred_int_overall.ub_pred_25 ./ N_msm),
         lw=3,
         color=1,
@@ -378,11 +379,11 @@ plot!(plt_prev, _wks, prev_cred_int_overall.median_pred ./ N_msm,
         subplot=2,
         grid=nothing,
         title="Overall")
-plot!(plt_prev, _wks, prev_cred_no_int_overall.median_pred ./ N_msm,
+plot!(plt_prev, _wks, prev_cred_no_int_overall.mean_pred ./ N_msm,
         subplot=2,
         color=1, ls=:dash, lw=3, lab="")
 ##
-plt_prev_overall = plot(_wks, prev_cred_int.median_pred[:, 11] ./ (N_uk - N_msm),
+plt_prev_overall = plot(_wks, prev_cred_int.mean_pred[:, 11] ./ (N_uk - N_msm),
         ribbon=(prev_cred_int.lb_pred_25[:, 11] ./ (N_uk - N_msm), prev_cred_int.ub_pred_25[:, 11] ./ (N_uk - N_msm)),
         lw=3,
         lab="Forecast",
@@ -394,7 +395,7 @@ plt_prev_overall = plot(_wks, prev_cred_int.median_pred[:, 11] ./ (N_uk - N_msm)
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
-plot!(plt_prev_overall, _wks[11:end], prev_cred_no_int.median_pred[11:end, 11] ./ (N_uk - N_msm),
+plot!(plt_prev_overall, _wks[11:end], prev_cred_no_int.mean_pred[11:end, 11] ./ (N_uk - N_msm),
         color=2, ls=:dash, lw=3, lab="Worst case scenario")
 ##
 plt = plot(plt_chng, plt_chng_oth,plt_prev, plt_prev_overall,
@@ -408,17 +409,17 @@ savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
 
 ## Mean sexual contacts of a detected person
 
-function sx_contacts_msm(pred, mean_daily_cnts)
-        sum(mean_daily_cnts' .* pred[:, 1:10] ./ (sum(pred[:, 1:10], dims=2) .+ 1e-10), dims=2) #Very slight perturbation to avoid NaN
-end
+# function sx_contacts_msm(pred, mean_daily_cnts)
+#         sum(mean_daily_cnts' .* pred[:, 1:10] ./ (sum(pred[:, 1:10], dims=2) .+ 1e-10), dims=2) #Very slight perturbation to avoid NaN
+# end
 
-observed_case_sx_cnt_rates = map(pred -> sx_contacts_msm(pred, mean_daily_cnts), [pred[3] for pred in preds_and_incidence_no_interventions])
-obs_case_sx_cnt_rates_pred = prev_cred_intervals(observed_case_sx_cnt_rates)
+# observed_case_sx_cnt_rates = map(pred -> sx_contacts_msm(pred, mean_daily_cnts), [pred[3] for pred in preds_and_incidence_no_interventions])
+# obs_case_sx_cnt_rates_pred = prev_cred_intervals(observed_case_sx_cnt_rates)
 
-plot(long_wks .- Week(1), obs_case_sx_cnt_rates_pred.median_pred,
-        ribbon=(obs_case_sx_cnt_rates_pred.lb_pred_25, obs_case_sx_cnt_rates_pred.ub_pred_25),
-        title="Typical sexual contact (cases)", fillalpha=0.2,
-        lab="",
-        left_margin=5mm,
-        size=(800, 600), dpi=250,
-        tickfont=11, titlefont=18, guidefont=18, legendfont=11)
+# plot(long_wks .- Week(1), obs_case_sx_cnt_rates_pred.median_pred,
+#         ribbon=(obs_case_sx_cnt_rates_pred.lb_pred_25, obs_case_sx_cnt_rates_pred.ub_pred_25),
+#         title="Typical sexual contact (cases)", fillalpha=0.2,
+#         lab="",
+#         left_margin=5mm,
+#         size=(800, 600), dpi=250,
+#         tickfont=11, titlefont=18, guidefont=18, legendfont=11)

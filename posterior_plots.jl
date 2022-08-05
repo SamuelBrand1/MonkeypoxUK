@@ -8,18 +8,19 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws and structure
-smc = load("posteriors/smc_posterior_draws_2022-07-25.jld2")["smc_cng_pnt"]
+smc = load("posteriors/smc_posterior_draws_2022-08-01.jld2")["smc_cng_pnt"]
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
 param_names = [:clique_dispersion, :prob_detect, :mean_inf_period, :prob_transmission,
-    :R0_other, :detect_dispersion, :init_infs, :chg_pnt, :sex_trans_red, :other_trans_red]
+    :R0_other, :detect_dispersion, :init_infs, :chg_pnt, :sex_trans_red, :other_trans_red,:sex_trans_red_post_WHO, :other_trans_red_post_WHO]
 
 transformations = [fill(x -> x, 2)
     x -> 1 + mean(Geometric(1 / (1 + x))) # Translate the infectious period parameter into mean infectious period
     fill(x -> x, 2)
     x -> 1 / (x + 1) #Translate "effective sample size" for Beta-Binomial on sampling to overdispersion parameter
-    fill(x -> x, 4)]
+    fill(x -> x, 4);
+    fill(x -> x, 2)]
 function col_transformations(X, f_vect)
     for j = 1:size(X, 2)
         X[:, j] = f_vect[j].(X[:, j])
@@ -49,9 +50,11 @@ pretty_parameter_names = ["Clique size dispersion",
     "Init. Infs scale",
     "Timing: 1st change point",
     "Sex. trans. reduction: 1st cng pnt",
-    "Other trans. reduction: 1st cng pnt"]
+    "Other trans. reduction: 1st cng pnt",
+    "Sex. trans. reduction: WHO cng pnt",
+    "Sex. trans. reduction: WHO cng pnt"]
 
-post_plt = plot(; layout=(5, 2),
+post_plt = plot(; layout=(6, 2),
     size=(800, 2000), dpi=250,
     left_margin=10mm,
     right_margin=10mm)
