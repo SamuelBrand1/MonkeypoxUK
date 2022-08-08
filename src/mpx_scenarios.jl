@@ -25,21 +25,7 @@ plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)]
 display(plt_vacs)
 savefig(plt_vacs, "plots/vaccine_rollout.png")
 
-## Fit future change in risk based on  posterior for first change point with extra dispersion
-function mom_fit_beta(X, shrinkage,bias_factor)
-        x̄ = mean(X)
-        v̄ = var(X)
-        if v̄ < x̄ * (1 - x̄)
-                α = ((x̄^2 * (1 - x̄) / v̄) - x̄) / shrinkage
-                β = (((x̄ * (1 - x̄)^2) / v̄) - (1 - x̄)) / shrinkage
-                α̂ = bias_factor*α
-                β̂ = (1-bias_factor)*α + β
-                return Beta(α̂, β̂)
-        else
-                println("ERROR")
-                return nothing
-        end
-end
+
 trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1,0.5)
 trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1,0.5)
 

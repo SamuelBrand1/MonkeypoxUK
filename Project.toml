@@ -1,3 +1,5 @@
+name = "MonkeypoxUK"
+uuid = "b9274928-d50e-4c3b-b5b5-05438ee43544"
 authors = ["Samuel Brand <48288458+SamuelBrand1@users.noreply.github.com>"]
 version = "0.1.0"
 

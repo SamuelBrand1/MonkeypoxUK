@@ -1,9 +1,6 @@
 ## Idea is to have both fitness and SBM effects in sexual contact
 
-using Distributions, StatsBase, StatsPlots
-using LinearAlgebra, RecursiveArrayTools
-using OrdinaryDiffEq, ApproxBayes
-using JLD2, Roots
+
 
 ## Grab UK data
 

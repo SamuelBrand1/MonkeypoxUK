@@ -1,0 +1,76 @@
+"""
+    function cred_intervals(preds)
+
+Generate posterior mean, median and 25% and 2.5% (relative to posterior mean) predictions from a posterior sample array over two-column matrices that 
+represent sampled weekly incidence of MSM and non-MSM people. Output a `NamedTuple` object.
+"""
+function cred_intervals(preds)
+    mean_pred = hcat([mean([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
+        [mean([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
+    median_pred = hcat([median([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
+        [median([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
+
+    lb_pred_25 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)])
+
+    lb_pred_025 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)])
+
+    ub_pred_25 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- mean_pred
+    ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- mean_pred
+    return (; mean_pred, median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+end
+
+"""
+    function prev_cred_intervals(preds)
+
+Generate posterior mean, median and 25% and 2.5% (relative to posterior mean) predictions from a posterior sample array over n-column matrices that 
+represent sampled weekly prevalence of different groups of MSM and non-MSM people. Output a `NamedTuple` object.
+"""
+function prev_cred_intervals(preds)
+    d1, d2 = size(preds[1])
+    num = length(preds)
+    median_pred = Matrix{Float64}(undef, d1, d2)
+    mean_pred = similar(median_pred)
+    lb_pred_25 = similar(median_pred)
+    lb_pred_025 = similar(median_pred)
+    ub_pred_25 = similar(median_pred)
+    ub_pred_025 = similar(median_pred)
+    for i = 1:d1, j = 1:d2
+        v = [preds[n][i, j] for n = 1:num]
+        median_pred[i, j] = median(v)
+        mean_pred[i, j] = mean(v)
+        lb_pred_25[i, j] = quantile(v, 0.25)
+        lb_pred_025[i, j] = quantile(v, 0.025)
+        ub_pred_25[i, j] = quantile(v, 0.75)
+        ub_pred_025[i, j] = quantile(v, 0.975)
+    end
+    lb_pred_25 .= mean_pred .- lb_pred_25
+    lb_pred_025 .= mean_pred .- lb_pred_025
+    ub_pred_25 .= ub_pred_25 .- mean_pred
+    ub_pred_025 .= ub_pred_025 .- mean_pred
+    return (; median_pred, mean_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+end
+
+"""
+    function mom_fit_beta(X; shrinkage = 1.0, bias_factor = 1.0)
+
+    Fit future change in risk based on posterior for first change point with extra dispersion due to `shrinkage`,
+        and possible bias due to `bias_factor`.
+"""
+function mom_fit_beta(X; shrinkage=1.0, bias_factor=1.0)
+    x̄ = mean(X)
+    v̄ = var(X)
+    if v̄ < x̄ * (1 - x̄)
+        α = ((x̄^2 * (1 - x̄) / v̄) - x̄) / shrinkage
+        β = (((x̄ * (1 - x̄)^2) / v̄) - (1 - x̄)) / shrinkage
+        α̂ = bias_factor * α
+        β̂ = (1 - bias_factor) * α + β
+        return Beta(α̂, β̂)
+    else
+        println("ERROR")
+        return nothing
+    end
+end
