@@ -28,7 +28,7 @@ function col_transformations(X, f_vect)
     return X
 end
 
-val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
+val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> hcat(X[:,1:10],X[:,11].*X[:,4],X[:,12].*X[:,5])  |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
 chn = Chains(val_mat, param_names)
 
 write("posteriors/posterior_chain_" * string(wks[end]) * ".jls", chn)
@@ -40,6 +40,8 @@ for j = 1:length(prior_tuple)
     prior_val_mat[:, j] .= rand(prior_tuple[j], 10_000)
 end
 prior_val_mat = col_transformations(prior_val_mat, transformations)
+prior_val_mat[:,11] .= prior_val_mat[:,11].*prior_val_mat[:,4]
+prior_val_mat[:,12] .= prior_val_mat[:,11].*prior_val_mat[:,5]
 ##
 pretty_parameter_names = ["Clique size dispersion",
     "Prob. of detection",
