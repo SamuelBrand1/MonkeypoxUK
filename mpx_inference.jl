@@ -1,16 +1,20 @@
 ## Idea is to have both fitness and SBM effects in sexual contact
 
-
+using Distributions, StatsBase, StatsPlots
+using LinearAlgebra, RecursiveArrayTools
+using OrdinaryDiffEq, ApproxBayes
+using JLD2, MCMCChains, Roots
+import MonkeypoxUK
 
 ## Grab UK data
 
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
-##
-_p = [0.01, 0.5, 20, 0.2, 0.5, 6, 1.5, 130, 0.7, 0.3,0.5,0.5]
+## Check model runs
 
-err, pred = mpx_sim_function_chp(_p, constants, mpxv_wkly)
+_p = [0.01, 0.5, 20, 0.2, 0.5, 6, 1.5, 130, 0.7, 0.3,0.5,0.5]
+err, pred = MonkeypoxUK.mpx_sim_function_chp(_p, constants, mpxv_wkly[1:9,:])
 
 plt = plot(pred, color=[1 2])
 scatter!(plt, mpxv_wkly, color=[1 2])
@@ -34,21 +38,21 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
 
 ## Prior predictive checking - simulation
 draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
-prior_sims = map(θ -> mpx_sim_function_chp(θ, constants, mpxv_wkly), draws)
+prior_sims = map(θ -> MonkeypoxUK.mpx_sim_function_chp(θ, constants, mpxv_wkly[1:9,:]), draws)
 
 ##Prior predictive checking - simulation
 prior_preds = [sim[2] for sim in prior_sims]
 plt = plot(; ylabel="Weekly cases",
     title="Prior predictive checking")
 for pred in prior_preds
-    plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
+    plot!(plt, wks[1:9], pred, lab="", color=[1 2], alpha=0.3)
 end
 display(plt)
-savefig(plt, "plots/prior_predictive_checking_plot.png")
+savefig(plt, "plots/prior_predictive_checking_plot"*string(wks[9])*"".png")
 
 ## Model-based calibration of target tolerance
 # min_mbc_errs = map(n -> minimum(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
-mbc_errs = map(n -> mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
+mbc_errs = map(n -> MonkeypoxUK.mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
 
 ##Find target tolerance and plot error distribution
 target_perc = 0.05 #Where in error distribution to target tolerance
@@ -64,7 +68,7 @@ display(err_hist)
 savefig(err_hist, "plots/mbc_error_calibration_plt.png")
 
 ##Run inference
-setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
+setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     12, # number of parameters
     ϵ_target, #target ϵ
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
@@ -75,23 +79,23 @@ setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     kernel=gaussiankernel,
     constants=constants,
     maxiterations=10^10)
+##
 
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:9,:], verbose=true, progress=true)#, parallel=true)
+@save("posteriors/smc_posterior_draws_"*string(wks[9])*".jld2", smc_cng_pnt)
 
 ##
-@save("posteriors/smc_posterior_draws_"*string(wks[end])*".jld2", smc_cng_pnt)
-
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
-post_preds = [part.other for part in smc_cng_pnt.particles]
-plt = plot(; ylabel="Weekly cases",
-    title="Posterior predictive checking")
-for pred in post_preds
-    plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
-end
-scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
-display(plt)
+# post_preds = [part.other for part in smc_cng_pnt.particles]
+# plt = plot(; ylabel="Weekly cases",
+#     title="Posterior predictive checking")
+# for pred in post_preds
+#     plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
+# end
+# scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
+# display(plt)
 
 
 

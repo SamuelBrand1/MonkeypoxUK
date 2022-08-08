@@ -1,7 +1,7 @@
 using CSV, DataFrames, Plots, Dates, Plots.PlotMeasures
 
 ##
-mpxv_data = CSV.File("mpvx_latest.csv") |> DataFrame
+mpxv_data = CSV.File("data/mpvx_latest.csv") |> DataFrame
 UK_mpxv_data = mpxv_data[[c ∈ ["England", "Wales", "Scotland", "Northern Ireland"] for c in mpxv_data.Country], :]
 
 #Find least missing date col
