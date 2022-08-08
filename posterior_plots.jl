@@ -8,7 +8,8 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws and structure
-smc = load("posteriors/smc_posterior_draws_2022-08-01.jld2")["smc_cng_pnt"]
+# smc = load("posteriors/smc_posterior_draws_2022-08-01.jld2")["smc_cng_pnt"]
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters

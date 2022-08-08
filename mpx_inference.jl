@@ -1,5 +1,5 @@
 ## Idea is to have both fitness and SBM effects in sexual contact
-
+using Revise
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
@@ -11,15 +11,6 @@ import MonkeypoxUK
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
-## Check model runs
-
-_p = [0.01, 0.5, 20, 0.2, 0.5, 6, 1.5, 130, 0.7, 0.3,0.5,0.5]
-err, pred = MonkeypoxUK.mpx_sim_function_chp(_p, constants, mpxv_wkly[1:9,:])
-
-plt = plot(pred, color=[1 2])
-scatter!(plt, mpxv_wkly, color=[1 2])
-display(plt)
-print(err)
 
 ## Priors
 
@@ -37,40 +28,14 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(1, 4)]#trans_red_other WHO 12
 
 ## Prior predictive checking - simulation
-draws = [rand.(prior_vect_cng_pnt) for i = 1:1000]
-prior_sims = map(θ -> MonkeypoxUK.mpx_sim_function_chp(θ, constants, mpxv_wkly[1:9,:]), draws)
 
-##Prior predictive checking - simulation
-prior_preds = [sim[2] for sim in prior_sims]
-plt = plot(; ylabel="Weekly cases",
-    title="Prior predictive checking")
-for pred in prior_preds
-    plot!(plt, wks[1:9], pred, lab="", color=[1 2], alpha=0.3)
-end
-display(plt)
-savefig(plt, "plots/prior_predictive_checking_plot"*string(wks[9])*".png")
-
-## Model-based calibration of target tolerance
-# min_mbc_errs = map(n -> minimum(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
-mbc_errs = map(n -> MonkeypoxUK.mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
-
-##Find target tolerance and plot error distribution
-target_perc = 0.05 #Where in error distribution to target tolerance
-ϵ_target = find_zero(x -> target_perc - sum(mbc_errs .< x) / length(mbc_errs), (0, 2))
-err_hist = histogram(mbc_errs, norm=:pdf, nbins=500,
-    lab="",
-    title="Sampled errors from simulations with exact parameters",
-    xlabel="L1 relative error",
-    xlims=(0, 5),
-    size=(700, 400))
-vline!(err_hist, [ϵ_target], lab="$(round(Int64,target_perc*100))th percentile (target err. = $(round(ϵ_target,digits = 3)))", lw=3)
-display(err_hist)
-savefig(err_hist, "plots/mbc_error_calibration_plt"*string(wks[9])*".png")
+ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks[1:9], mpxv_wkly[1:9, :], constants)
 
 ##Run inference
+
 setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     12, # number of parameters
-    ϵ_target, #target ϵ
+    1000.0, #target ϵ derived from simulation based calibration
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=1000,
     convergence=0.05,
@@ -81,16 +46,17 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     maxiterations=10^10)
 ##
 
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:9,:], verbose=true, progress=true)#, parallel=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[9])*".jld2", smc_cng_pnt)
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:9, :], verbose=true, progress=true)#, parallel=true)
+# @save("posteriors/smc_posterior_draws_" * string(wks[9]) * ".jld2", smc_cng_pnt)
+param_draws = [part.params for part in smc_cng_pnt.particles]
+# @save("posteriors/param_drawsTEST" * string(wks[9]) * ".jld2", param_draws)
 
 ##
 
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:12,:], verbose=true, progress=true)#, parallel=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[12])*".jld2", smc_cng_pnt)
+@load("posteriors/param_drawsTEST2022-06-27.jld2")
 
-##
-
+predictions = MonkeypoxUK.generate_scenario_projections(param_draws,wks,mpxv_wkly,constants)
+plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=false)
 ##posterior predictive checking - simple plot to see coherence of model with data
 
 # post_preds = [part.other for part in smc_cng_pnt.particles]

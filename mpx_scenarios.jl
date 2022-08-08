@@ -1,14 +1,21 @@
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
-using OrdinaryDiffEq, ApproxBayes
+using OrdinaryDiffEq, ApproxBayes,MCMCChains
 using JLD2
+import MonkeypoxUK
 
 ## Grab UK data and model set up
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws
+mpx_sim_function_chp = MonkeypoxUK.mpx_sim_function_chp
 smc = load("posteriors/smc_posterior_draws_2022-08-01.jld2")["smc_cng_pnt"]
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
+##
+predictions = MonkeypoxUK.generate_scenario_projections(smc, wks, mpxv_wkly, constants)
+
+##
 param_draws = [part.params for part in smc.particles]
 
 ## Public health emergency effect forecasts
@@ -26,17 +33,17 @@ display(plt_vacs)
 savefig(plt_vacs, "plots/vaccine_rollout.png")
 
 
-trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1,0.5)
-trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1,0.5)
+trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1, 0.5)
+trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1, 0.5)
 
 ##
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
 inf_duration_red = 0.0
 
 
-interventions_ensemble = [(trans_red2=θ[9]*θ[11],
+interventions_ensemble = [(trans_red2=θ[9] * θ[11],
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
-        trans_red_other2 = θ[10]*θ[12],
+        trans_red_other2=θ[10] * θ[12],
         wkly_vaccinations, chp_t2, inf_duration_red) for θ in param_draws]
 
 no_interventions_ensemble = [(trans_red2=0.0,
@@ -49,9 +56,9 @@ no_red_ensemble = [(trans_red2=0.0,
         trans_red_other2=0.0,
         wkly_vaccinations, chp_t2, inf_duration_red) for θ in param_draws]
 
-no_vac_ensemble = [(trans_red2=θ[9]*θ[11],#Based on posterior for first change point with extra dispersion
+no_vac_ensemble = [(trans_red2=θ[9] * θ[11],#Based on posterior for first change point with extra dispersion
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
-        trans_red_other2=θ[10]*θ[12],
+        trans_red_other2=θ[10] * θ[12],
         wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for θ in param_draws]
 
 
@@ -87,7 +94,7 @@ plt_msm = plot(; ylabel="Weekly cases",
         legend=:topleft,
         # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
         # ylims=(0.8, 3001),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
@@ -125,7 +132,7 @@ plt_nmsm = plot(; ylabel="Weekly cases",
         legend=:topleft,
         # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
         # ylims=(0.8, 3001),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
@@ -173,7 +180,7 @@ plt_cm_msm = plot(; ylabel="Cumulative cases",
         title="UK Monkeypox cumulative case projections (MSM)",#yscale=:log10,
         legend=:topleft,
         yticks=(0:2500:12500, 0:2500:12500),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
@@ -206,7 +213,7 @@ plt_cm_nmsm = plot(; ylabel="Cumulative cases",
         title="UK Monkeypox cumulative case projections (non-MSM)",#yscale=:log10,
         legend=:topleft,
         # yticks=(0:2500:12500, 0:2500:12500),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
@@ -274,7 +281,7 @@ plt_chng = plot(dates, sx_trans_risk_cred_int.mean_pred,
         title="Transmission probability (sexual contacts)",
         ylabel="Prob. per sexual contact",
         xlims=(long_wks[1] - Day(7), long_wks[end] - Day(7)),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
@@ -307,7 +314,7 @@ plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.mean_pred,
         title="Reproductive number (non-sexual contacts)",
         ylabel="R(t) (non-sexual contacts)",
         xlims=(long_wks[1] - Day(7), long_wks[end] - Day(7)),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
@@ -346,7 +353,7 @@ plt_prev = plot(_wks, prev_cred_int.mean_pred[:, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         lab=hcat(["Forecast"], fill("", 1, 9)),
         yticks=(0:0.02:0.18, [string(round(y * 100)) * "%" for y in 0:0.02:0.18]),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         ylabel="Prevalence",
         title="MPX prevalence by sexual activity group (MSM)",
         color=:black,
@@ -385,7 +392,7 @@ plt_prev_overall = plot(_wks, prev_cred_int.mean_pred[:, 11] ./ (N_uk - N_msm),
         title="MPX Prevalence (non-MSM)",
         color=2,
         yticks=(0:5e-7:4.0e-6, [string(round(y * 100, digits=10)) * "%" for y in 0:5e-7:4.0e-6]),
-        xticks = ([Date(2022,5,1) + Month(k) for k = 0:5],[monthname(Date(2022,5,1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         fillalpha=0.2,
         left_margin=5mm,
         size=(800, 600), dpi=250,
@@ -393,7 +400,7 @@ plt_prev_overall = plot(_wks, prev_cred_int.mean_pred[:, 11] ./ (N_uk - N_msm),
 plot!(plt_prev_overall, _wks[11:end], prev_cred_no_int.mean_pred[11:end, 11] ./ (N_uk - N_msm),
         color=2, ls=:dash, lw=3, lab="Worst case scenario")
 ##
-plt = plot(plt_chng, plt_chng_oth,plt_prev, plt_prev_overall,
+plt = plot(plt_chng, plt_chng_oth, plt_prev, plt_prev_overall,
         size=(1750, 1600), dpi=250,
         left_margin=10mm,
         bottom_margin=10mm,
