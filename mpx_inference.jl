@@ -48,7 +48,7 @@ for pred in prior_preds
     plot!(plt, wks[1:9], pred, lab="", color=[1 2], alpha=0.3)
 end
 display(plt)
-savefig(plt, "plots/prior_predictive_checking_plot"*string(wks[9])*"".png")
+savefig(plt, "plots/prior_predictive_checking_plot"*string(wks[9])*".png")
 
 ## Model-based calibration of target tolerance
 # min_mbc_errs = map(n -> minimum(map(x -> mpx_sim_function_chp(draws[n],constants,prior_sims[n][2])[1],1:5)),1:1000)
@@ -65,7 +65,7 @@ err_hist = histogram(mbc_errs, norm=:pdf, nbins=500,
     size=(700, 400))
 vline!(err_hist, [ϵ_target], lab="$(round(Int64,target_perc*100))th percentile (target err. = $(round(ϵ_target,digits = 3)))", lw=3)
 display(err_hist)
-savefig(err_hist, "plots/mbc_error_calibration_plt.png")
+savefig(err_hist, "plots/mbc_error_calibration_plt"*string(wks[9])*".png")
 
 ##Run inference
 setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
@@ -83,6 +83,11 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:9,:], verbose=true, progress=true)#, parallel=true)
 @save("posteriors/smc_posterior_draws_"*string(wks[9])*".jld2", smc_cng_pnt)
+
+##
+
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:12,:], verbose=true, progress=true)#, parallel=true)
+@save("posteriors/smc_posterior_draws_"*string(wks[12])*".jld2", smc_cng_pnt)
 
 ##
 
