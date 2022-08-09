@@ -9,11 +9,14 @@ include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
 ##Load posterior draws
-mpx_sim_function_chp = MonkeypoxUK.mpx_sim_function_chp
-smc = load("posteriors/smc_posterior_draws_2022-08-01.jld2")["smc_cng_pnt"]
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
+
+draws = load("posteriors/posterior_param_draws_2022-06-27.jld2")["param_draws"]
+# smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
 ##
-predictions = MonkeypoxUK.generate_scenario_projections(smc, wks, mpxv_wkly, constants)
+predictions = MonkeypoxUK.generate_scenario_projections(draws, wks, mpxv_wkly, constants)
+
+##
+plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=true)
 
 ##
 param_draws = [part.params for part in smc.particles]
