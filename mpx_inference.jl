@@ -46,14 +46,23 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     maxiterations=10^10)
 ##
 
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:9, :], verbose=true, progress=true)#, parallel=true)
-# @save("posteriors/smc_posterior_draws_" * string(wks[9]) * ".jld2", smc_cng_pnt)
-param_draws = [part.params for part in smc_cng_pnt.particles]
-# @save("posteriors/param_drawsTEST" * string(wks[9]) * ".jld2", param_draws)
+
+
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:9,:], verbose=true, progress=true)#, parallel=true)
+@save("posteriors/smc_posterior_draws_"*string(wks[9])*".jld2", smc_cng_pnt)
+smc_9 = load("posteriors/smc_posterior_draws_2022-06-27.jld2")["smc_cng_pnt"]
+param_draws = [particle.params for particle in smc_9.particles]
+@save("posteriors/posterior_param_draws_"*string(wks[9])*".jld2", param_draws)
 
 ##
 
-@load("posteriors/param_drawsTEST2022-06-27.jld2")
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:12,:], verbose=true, progress=true)#, parallel=true)
+param_draws = [particle.params for particle in smc_cng_pnt.particles]
+
+@save("posteriors/smc_posterior_draws_"*string(wks[12])*".jld2", smc_cng_pnt)
+@save("posteriors/posterior_param_draws_"*string(wks[9])*".jld2", param_draws)
+
+##
 
 predictions = MonkeypoxUK.generate_scenario_projections(param_draws,wks,mpxv_wkly,constants)
 plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=false)
