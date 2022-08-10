@@ -5,7 +5,14 @@ The `MonkeypoxUK` module provides methods for simulating MPX spread among men-wh
 ### Quick start for inference
 
 1. Download [Julia](https://julialang.org/downloads/).
-2. 
+2. Clone this repository.
+3. Start the Julia REPL.
+4. Change working directory to where this repo is cloned.
+5. Enter `Pkg` mode by pressing `]`
+6. Activate the environment for `MonkeypoxUK` and download the underlying dependencies.
+    > pkg> activate . \
+    > pkg> instantiate
+7. The script `mpx_inference.jl` covers running the inference methodology. The script `mpxv_datawrangling.jl` loads the underlying case data into a two matrix `mpxv_wkly` where rows are weeks and first col is reported MSM cases and second col is reported non-MSM cases. The Monday date for each week is given as a `Vector{Date}` array `wks`.
 
 ### Latest case projections for the UK
 <figure>
