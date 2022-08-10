@@ -1,5 +1,9 @@
-# monkeypox_UK
- Some code for monkeypox
+# MonkeypoxUK
+
+
 
 ### Latest case projections
-![Posterior means and 25-75% posterior probabilities](plots/case_projections_2022-08-01.png)
+<figure>
+<img src="plots/case_projections_2022-08-01.png" alt="Trulli" style="width:100%">
+<figcaption align = "center"><b>Posterior means and 25-75% posterior probabilities </b></figcaption>
+</figure>
