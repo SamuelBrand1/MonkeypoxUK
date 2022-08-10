@@ -7,12 +7,10 @@ using JLD2, MCMCChains, Roots
 import MonkeypoxUK
 
 ## Grab UK data
-
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
-
-## Priors
+## Define priors for the parameters
 
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(5, 5), #p_detect  2
@@ -27,9 +25,9 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(1, 4),#trans_red WHO  11
     Beta(1, 4)]#trans_red_other WHO 12
 
-## Prior predictive checking - simulation
-n_wk = 5
-ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks[1:n_wk], mpxv_wkly[1:n_wk, :], constants)
+
+## Use SBC for defining the ABC error target and generate prior predictive plots
+ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants)
 
 setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     12, # number of parameters
@@ -43,65 +41,12 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     constants=constants,
     maxiterations=10^10)
 
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:n_wk,:], verbose=true, progress=true)#, parallel=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[n_wk])*".jld2", smc_cng_pnt)
+##Run ABC    
+smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
+@save("posteriors/smc_posterior_draws_"*string(wks[end])*".jld2", smc_cng_pnt)
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
-@save("posteriors/posterior_param_draws_"*string(wks[n_wk])*".jld2", param_draws)
+@save("posteriors/posterior_param_draws_"*string(wks[end])*".jld2", param_draws)
 
-##
-n_wk = 9
-ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks[1:n_wk], mpxv_wkly[1:n_wk, :], constants)
-
-setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
-    12, # number of parameters
-    ϵ_target, #target ϵ derived from simulation based calibration
-    Prior(prior_vect_cng_pnt); #Prior for each of the parameters
-    ϵ1=1000,
-    convergence=0.05,
-    nparticles=2000,
-    α=0.5,
-    kernel=gaussiankernel,
-    constants=constants,
-    maxiterations=10^10)
-
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:n_wk,:], verbose=true, progress=true)#, parallel=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[n_wk])*".jld2", smc_cng_pnt)
-param_draws = [particle.params for particle in smc_cng_pnt.particles]
-@save("posteriors/posterior_param_draws_"*string(wks[n_wk])*".jld2", param_draws)
-
-##
-mpxv_wkly
-n_wk = 14
-ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks[1:n_wk], mpxv_wkly[1:n_wk, :], constants)
-
-setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
-    12, # number of parameters
-    ϵ_target, #target ϵ derived from simulation based calibration
-    Prior(prior_vect_cng_pnt); #Prior for each of the parameters
-    ϵ1=1000,
-    convergence=0.05,
-    nparticles=2000,
-    α=0.5,
-    kernel=gaussiankernel,
-    constants=constants,
-    maxiterations=10^10)
-
-smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:n_wk,:], verbose=true, progress=true)#, parallel=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[n_wk])*".jld2", smc_cng_pnt)
-param_draws = [particle.params for particle in smc_cng_pnt.particles]
-@save("posteriors/posterior_param_draws_"*string(wks[n_wk])*".jld2", param_draws)
-
-##
-# smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly[1:12,:], verbose=true, progress=true)#, parallel=true)
-# param_draws = [particle.params for particle in smc_cng_pnt.particles]
-
-# @save("posteriors/smc_posterior_draws_"*string(wks[12])*".jld2", smc_cng_pnt)
-# @save("posteriors/posterior_param_draws_"*string(wks[12])*".jld2", param_draws)
-
-##
-
-predictions = MonkeypoxUK.generate_scenario_projections(param_draws,wks,mpxv_wkly,constants)
-plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=false)
 ##posterior predictive checking - simple plot to see coherence of model with data
 
 smc_cng_pnt = load("posteriors/smc_posterior_draws_2022-06-27.jld2")["smc_cng_pnt"]
