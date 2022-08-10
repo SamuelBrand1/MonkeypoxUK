@@ -72,6 +72,7 @@ preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_int
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
+preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans = predictions
 
 preds = [x[1] for x in preds_and_incidence_interventions]
 preds_nointervention = [x[1] for x in preds_and_incidence_no_interventions]
@@ -85,11 +86,13 @@ cum_cases_noredtrans_forwards = [cumsum(x[1][(d1+1):end, :], dims=1) for x in pr
 
 
 ##Simulation projections
+long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
+long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
 
-cred_int = cred_intervals(preds)
-cred_int_rwc = cred_intervals(preds_nointervention)
-cred_int_nv = cred_intervals(preds_novacs)
-cred_int_nr = cred_intervals(preds_noredtrans)
+cred_int = MonkeypoxUK.cred_intervals(preds)
+cred_int_rwc = MonkeypoxUK.cred_intervals(preds_nointervention)
+cred_int_nv = MonkeypoxUK.cred_intervals(preds_novacs)
+cred_int_nr = MonkeypoxUK.cred_intervals(preds_noredtrans)
 
 ## MSM projections
 plt_msm = plot(; ylabel="Weekly cases",
@@ -172,10 +175,10 @@ scatter!(plt_nmsm, wks[1:(end-1)], mpxv_wkly[1:(end-1), 2],
 ##cumulative Incidence plots
 # cred_int_cum_incidence = cred_intervals(cum_incidences)
 # cred_int_cum_incidence_no_intervention = cred_intervals(cum_incidences_nointervention)
-cred_int_cum_incidence = cred_intervals(cum_cases_forwards)
-cred_int_cum_incidence_no_intervention = cred_intervals(cum_cases_nointervention_forwards)
-cred_int_cum_no_vaccines = cred_intervals(cum_cases_novaccines_forwards)
-cred_int_cum_noredtrans = cred_intervals(cum_cases_noredtrans_forwards)
+cred_int_cum_incidence = MonkeypoxUK.cred_intervals(cum_cases_forwards)
+cred_int_cum_incidence_no_intervention = MonkeypoxUK.cred_intervals(cum_cases_nointervention_forwards)
+cred_int_cum_no_vaccines = MonkeypoxUK.cred_intervals(cum_cases_novaccines_forwards)
+cred_int_cum_noredtrans = MonkeypoxUK.cred_intervals(cum_cases_noredtrans_forwards)
 
 
 total_cases = sum(mpxv_wkly, dims=1)
@@ -252,7 +255,8 @@ plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
         right_margin=10mm,
         layout=lo)
 display(plt)
-savefig(plt, "plots/case_projections_" * string(wks[end]) * ".png")
+
+savefig(plt, "plots/case_projections_" * string(wks[9]) * ".png")
 
 ## Change in transmission over time
 

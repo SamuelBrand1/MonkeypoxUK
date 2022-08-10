@@ -17,7 +17,7 @@ function simulation_based_calibration(prior_vect, wks, mpxv_wkly, constants; sav
     plt_priorpredcheck = plot(; ylabel="Weekly cases",
         title="Prior predictive checking")
     for pred in prior_preds
-        plot!(plt_priorpredcheck, wks[1:9], pred, lab="", color=[1 2], alpha=0.3)
+        plot!(plt_priorpredcheck, wks, pred, lab="", color=[1 2], alpha=0.3)
     end
     if savefigure
         savefig(plt_priorpredcheck, "plots/prior_predictive_checking_plot" * string(wks[end]) * ".png")
@@ -38,7 +38,7 @@ function simulation_based_calibration(prior_vect, wks, mpxv_wkly, constants; sav
         size=(700, 400))
     vline!(err_hist, [ϵ_target], lab="$(round(Int64,target_perc*100))th percentile (target err. = $(round(ϵ_target,digits = 3)))", lw=3)
     if savefigure
-        savefig(err_hist, "plots/mbc_error_calibration_plt" * string(wks[9]) * ".png")
+        savefig(err_hist, "plots/mbc_error_calibration_plt" * string(wks[end]) * ".png")
     end
     return ϵ_target, plt_priorpredcheck, err_hist
 end
