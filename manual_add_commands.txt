@@ -1,0 +1,16 @@
+cd("C:\\Users\\Thomas.House\\OneDrive - UK Health Security Agency\\repos\\MonkeypoxUK")
+
+Type this in to get the right underlying packages:
+
+Press ] to get to pkg
+
+add ApproxBayes, CSV, DataFrames, Dates, Distributions, JLD2, LinearAlgebra, MCMCChains, OrdinaryDiffEq, Plots, RecursiveArrayTools, Roots, StatsBase, StatsPlots
+
+Then BACKSPACE to get to julia and:
+
+push!(LOAD_PATH,"./")
+
+then run files using
+
+include("./mpx_inference.jl")
+

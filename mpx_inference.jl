@@ -4,7 +4,9 @@ using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
 using JLD2, MCMCChains, Roots
-import MonkeypoxUK
+##import MonkeypoxUK
+include("./src/dynamics.jl")
+include("./src/inference.jl")
 
 ## Grab UK data
 include("mpxv_datawrangling.jl");
@@ -27,9 +29,11 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
 
 
 ## Use SBC for defining the ABC error target and generate prior predictive plots
-ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants)
+##ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants)
+ϵ_target, plt_prc, hist_err = simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants)
 
-setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
+##setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
+setup_cng_pnt = ABCSMC(mpx_sim_function_chp, #simulation function
     12, # number of parameters
     ϵ_target, #target ϵ derived from simulation based calibration
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
@@ -49,7 +53,7 @@ param_draws = [particle.params for particle in smc_cng_pnt.particles]
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
-smc_cng_pnt = load("posteriors/smc_posterior_draws_2022-06-27.jld2")["smc_cng_pnt"]
+##smc_cng_pnt = load("posteriors/smc_posterior_draws_2022-06-27.jld2")["smc_cng_pnt"]
 post_preds = [part.other for part in smc_cng_pnt.particles]
 plt = plot(; ylabel="Weekly cases",
     title="Posterior predictive checking")

@@ -137,7 +137,8 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
         u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
         [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
-    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    ##mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    mpx_init = OrdinaryDiffEq.init(prob, FunctionMap(), save_everystep=false) #Begins week 1
     old_onsets = [0, 0]
     new_onsets = [0, 0]
     wk_num = 1
