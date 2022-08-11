@@ -2,7 +2,7 @@ using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes,MCMCChains
 using JLD2
-import MonkeypoxUK
+using MonkeypoxUK
 
 ## Grab UK data and model set up
 include("mpxv_datawrangling.jl");
@@ -10,16 +10,16 @@ include("setup_model.jl");
 
 ##Load posterior draws
 
-draws = load("posteriors/posterior_param_draws_2022-06-27.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-06-27.jld2")["param_draws"]
 # smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
-##
-predictions = MonkeypoxUK.generate_scenario_projections(draws, wks, mpxv_wkly, constants)
 
-##
-plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=true)
+# predictions = MonkeypoxUK.generate_scenario_projections(draws, wks, mpxv_wkly, constants)
+forecast = generate_forecast_projection(param_draws, wks, mpxv_wkly, constants)
+# ##
+# plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=true)
 
-##
-param_draws = [part.params for part in smc.particles]
+# ##
+# param_draws = [part.params for part in smc.particles]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
@@ -35,9 +35,6 @@ plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)]
 display(plt_vacs)
 savefig(plt_vacs, "plots/vaccine_rollout.png")
 
-
-trans_red2_prior = mom_fit_beta([θ[9] for θ in param_draws], 1, 0.5)
-trans_red_other2_prior = mom_fit_beta([θ[10] for θ in param_draws], 1, 0.5)
 
 ##
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
@@ -64,7 +61,7 @@ no_vac_ensemble = [(trans_red2=θ[9] * θ[11],#Based on posterior for first chan
         trans_red_other2=θ[10] * θ[12],
         wkly_vaccinations=zeros(size(long_mpxv_wkly)), chp_t2, inf_duration_red) for θ in param_draws]
 
-
+mpx_sim_function_interventions = MonkeypoxUK.mpx_sim_function_interventions
 preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, interventions_ensemble)
 preds_and_incidence_no_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_interventions_ensemble)
 preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_vac_ensemble)
@@ -72,9 +69,11 @@ preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_int
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
-preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans = predictions
+# preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans = predictions
 
-preds = [x[1] for x in preds_and_incidence_interventions]
+
+# preds = [x[1] for x in preds_and_incidence_interventions]
+pred = [x[1] for x in forecast]
 preds_nointervention = [x[1] for x in preds_and_incidence_no_interventions]
 preds_novacs = [x[1] for x in preds_and_incidence_no_vaccines]
 preds_noredtrans = [x[1] for x in preds_and_incidence_no_redtrans]
@@ -256,7 +255,10 @@ plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
         layout=lo)
 display(plt)
 
-savefig(plt, "plots/case_projections_" * string(wks[9]) * ".png")
+
+# savefig(plt, "plots/case_projections_" * string(wks[9]) * ".png")
+# savefig(plt, "plots/case_projections_ukhsa.png")
+
 
 ## Change in transmission over time
 

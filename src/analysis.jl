@@ -1,5 +1,33 @@
 """
-    function generate_scenario_projections(smc)
+    function generate_forecast_projection(param_draws, wks, mpxv_wkly, constants)
+
+Generate the forecast projection from posterior draws of the SMC-ABC algoritm.        
+"""
+function generate_forecast_projection(param_draws, wks, mpxv_wkly, constants)
+    ## Public health emergency effect forecasts
+    long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
+    long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
+
+    ##Generate main scenarios
+    chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
+    inf_duration_red = 0.0
+    wkly_vaccinations = constants[end-2]
+
+    interventions_ensemble = [(trans_red2=θ[9] * θ[11],
+        vac_effectiveness=rand(Uniform(0.7, 0.85)),
+        trans_red_other2=θ[10] * θ[12],
+        wkly_vaccinations, chp_t2, inf_duration_red) for θ in param_draws]
+
+    
+    #Simulate
+    preds_and_incidence_interventions = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, interventions_ensemble)
+    
+    return preds_and_incidence_interventions
+end
+
+
+"""
+    function generate_scenario_projections(param_draws, wks, mpxv_wkly, constants)
 
 Generate an ensemble of projections for each scenario from posterior draws of the SMC-ABC algoritm.        
 """
