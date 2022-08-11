@@ -49,12 +49,14 @@ param_draws = [particle.params for particle in smc_cng_pnt.particles]
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
-smc_cng_pnt = load("posteriors/smc_posterior_draws_2022-06-27.jld2")["smc_cng_pnt"]
+
 post_preds = [part.other for part in smc_cng_pnt.particles]
 plt = plot(; ylabel="Weekly cases",
     title="Posterior predictive checking")
 for pred in post_preds
-    plot!(plt, wks[1:9], pred, lab="", color=[1 2], alpha=0.3)
+
+    plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
+
 end
 scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
 display(plt)
