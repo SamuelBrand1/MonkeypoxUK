@@ -56,7 +56,6 @@ plt = plot(; ylabel="Weekly cases",
 for pred in post_preds
 
     plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
-
 end
 scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
 display(plt)

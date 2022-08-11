@@ -2,7 +2,7 @@ using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes,MCMCChains
 using JLD2
-import MonkeypoxUK
+using MonkeypoxUK
 
 ## Grab UK data and model set up
 include("mpxv_datawrangling.jl");
@@ -14,7 +14,7 @@ param_draws = load("posteriors/posterior_param_draws_2022-06-27.jld2")["param_dr
 # smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
 
 # predictions = MonkeypoxUK.generate_scenario_projections(draws, wks, mpxv_wkly, constants)
-
+forecast = generate_forecast_projection(param_draws, wks, mpxv_wkly, constants)
 # ##
 # plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=true)
 
@@ -69,10 +69,11 @@ preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_int
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
-preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans = predictions
+# preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans = predictions
 
 
-preds = [x[1] for x in preds_and_incidence_interventions]
+# preds = [x[1] for x in preds_and_incidence_interventions]
+pred = [x[1] for x in forecast]
 preds_nointervention = [x[1] for x in preds_and_incidence_no_interventions]
 preds_novacs = [x[1] for x in preds_and_incidence_no_vaccines]
 preds_noredtrans = [x[1] for x in preds_and_incidence_no_redtrans]
