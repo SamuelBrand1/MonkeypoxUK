@@ -1,7 +1,7 @@
 using CSV, DataFrames, Plots, Dates, Plots.PlotMeasures
 
 ##
-mpxv_data = CSV.File("data/mpvx_latest.csv") |> DataFrame
+mpxv_data = CSV.File("data/mpxv_latest.csv") |> DataFrame
 UK_mpxv_data = mpxv_data[[c ∈ ["England", "Wales", "Scotland", "Northern Ireland"] for c in mpxv_data.Country], :]
 
 #Find least missing date col
@@ -12,18 +12,18 @@ idxs_confirmed = UK_mpxv_data.Status .== "confirmed"
 # p/(1-p) = R ⟹ p = R(1-p) ⟹ p = R/(1+R)
 reported_msm_prop = [Date(2022,6,22) 0.96
                         Date(2022,7,6) 0.962;
-                        Date(2022,7,19) 0.965] #https://www.gov.uk/government/publications/monkeypox-outbreak-technical-briefings/investigation-into-monkeypox-outbreak-in-england-technical-briefing-4
+                        Date(2022,7,19) 0.965;
+                        Date(2022,8,1) 0.953] #https://www.gov.uk/government/publications/monkeypox-outbreak-technical-briefings/investigation-into-monkeypox-outbreak-in-england-technical-briefing-5
 
-msm_ratio = 1.0 ./ [Inf, 0.00000000, 0.01351351, 0.02222222, 0.05769231, 0.04575163,
-        0.01408451, 0.03296703, 0.03125000, 0.07575758, 0.06172840, 0.09677419] # Ratio estimates
-msm_freq = msm_ratio ./ (1 .+ msm_ratio) .|> x -> isnan(x) ? 1.0 : x
-msm_freq = [msm_freq; msm_freq[end, :]] # extend estimate
-# msm_freq = fill()
+# msm_ratio = 1.0 ./ [Inf, 0.00000000, 0.01351351, 0.02222222, 0.05769231, 0.04575163,
+#         0.01408451, 0.03296703, 0.03125000, 0.07575758, 0.06172840, 0.09677419] # Ratio estimates
+# msm_freq = msm_ratio ./ (1 .+ msm_ratio) .|> x -> isnan(x) ? 1.0 : x
+# msm_freq = [msm_freq; msm_freq[end, :]] # extend estimate
 ##
 
 first_day_wk_reported = Dates.firstdayofweek.(UK_mpxv_data.Date_confirmation[idxs_confirmed])
 wks = sort(unique(first_day_wk_reported))
-mpxv_wkly = [sum(first_day_wk_reported .== wk) for wk in wks] .* [fill(0.965,length(wks)) fill(1 - 0.965,length(wks))]
+mpxv_wkly = [sum(first_day_wk_reported .== wk) for wk in wks] .* [fill(reported_msm_prop[end,2],length(wks)) fill(1 - 0.965,length(wks))]
 
 #Plot data
 scatter(wks, mpxv_wkly, lab=["MSM" "non-MSM"],
