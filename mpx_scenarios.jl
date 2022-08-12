@@ -10,7 +10,7 @@ include("setup_model.jl");
 
 ##Load posterior draws
 
-param_draws = load("posteriors/posterior_param_draws_2022-08-01.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-08-08.jld2")["param_draws"]
 # smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
 
 # predictions = MonkeypoxUK.generate_scenario_projections(draws, wks, mpxv_wkly, constants)
@@ -68,11 +68,8 @@ preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_int
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
-# preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans = predictions
 
-
-# preds = [x[1] for x in preds_and_incidence_interventions]
-pred = [x[1] for x in forecast]
+preds = [x[1] for x in preds_and_incidence_interventions]
 preds_nointervention = [x[1] for x in preds_and_incidence_no_interventions]
 preds_novacs = [x[1] for x in preds_and_incidence_no_vaccines]
 preds_noredtrans = [x[1] for x in preds_and_incidence_no_redtrans]
@@ -289,6 +286,7 @@ plt_chng = plot(dates, sx_trans_risk_cred_int.mean_pred,
         title="Transmission probability (sexual contacts)",
         ylabel="Prob. per sexual contact",
         xlims=(long_wks[1] - Day(7), long_wks[end] - Day(7)),
+        ylims = (0,0.4),
         xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
@@ -322,6 +320,7 @@ plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.mean_pred,
         title="Reproductive number (non-sexual contacts)",
         ylabel="R(t) (non-sexual contacts)",
         xlims=(long_wks[1] - Day(7), long_wks[end] - Day(7)),
+        ylims = (0,0.65),
         xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
@@ -417,19 +416,3 @@ plt = plot(plt_chng, plt_chng_oth, plt_prev, plt_prev_overall,
 display(plt)
 savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
 
-## Mean sexual contacts of a detected person
-
-# function sx_contacts_msm(pred, mean_daily_cnts)
-#         sum(mean_daily_cnts' .* pred[:, 1:10] ./ (sum(pred[:, 1:10], dims=2) .+ 1e-10), dims=2) #Very slight perturbation to avoid NaN
-# end
-
-# observed_case_sx_cnt_rates = map(pred -> sx_contacts_msm(pred, mean_daily_cnts), [pred[3] for pred in preds_and_incidence_no_interventions])
-# obs_case_sx_cnt_rates_pred = prev_cred_intervals(observed_case_sx_cnt_rates)
-
-# plot(long_wks .- Week(1), obs_case_sx_cnt_rates_pred.median_pred,
-#         ribbon=(obs_case_sx_cnt_rates_pred.lb_pred_25, obs_case_sx_cnt_rates_pred.ub_pred_25),
-#         title="Typical sexual contact (cases)", fillalpha=0.2,
-#         lab="",
-#         left_margin=5mm,
-#         size=(800, 600), dpi=250,
-#         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
