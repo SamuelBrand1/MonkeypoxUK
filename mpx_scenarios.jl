@@ -11,14 +11,6 @@ include("setup_model.jl");
 ##Load posterior draws
 
 param_draws = load("posteriors/posterior_param_draws_2022-08-08.jld2")["param_draws"]
-# smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-01.jld2")
-
-# predictions = MonkeypoxUK.generate_scenario_projections(draws, wks, mpxv_wkly, constants)
-# ##
-# plt = MonkeypoxUK.plot_case_projections(predictions, wks, mpxv_wkly; savefigure=true)
-
-# ##
-# param_draws = [part.params for part in smc.particles]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
