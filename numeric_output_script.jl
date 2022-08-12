@@ -6,7 +6,8 @@ include("mpx_scenarios.jl");
 ovrall_prev_mean = prev_cred_int_overall.mean_pred ./ N_msm
 peak_val, peak_wk = findmax(ovrall_prev_mean)
 _wks[peak_wk]
-ovrall_prev_IQR = (ovrall_prev_mean[peak_wk] - prev_cred_int_overall.lb_pred_25[peak_wk] ./ N_msm, prev_cred_int_overall.median_pred[peak_wk] ./ N_msm, ovrall_prev_mean[peak_wk] + prev_cred_int_overall.ub_pred_25[peak_wk] ./ N_msm) .|> x -> round(x * 100, sigdigits=3)
+ovrall_prev_mean[peak_wk] |> x -> round(x * 100, sigdigits=3)
+@show ovrall_prev_IQR = (ovrall_prev_mean[peak_wk] - prev_cred_int_overall.lb_pred_25[peak_wk] ./ N_msm, prev_cred_int_overall.median_pred[peak_wk] ./ N_msm, ovrall_prev_mean[peak_wk] + prev_cred_int_overall.ub_pred_25[peak_wk] ./ N_msm) .|> x -> round(x * 100, sigdigits=3)
 #non-GBMSM peak prev
 ovrall_prev_mean_nmsm = prev_cred_int.mean_pred[peak_wk.I[1], 11] ./ (N_uk - N_msm)
 ovrall_prev_IQR_nmsm = (ovrall_prev_mean_nmsm - prev_cred_int.lb_pred_25[17, 11] ./ (N_uk - N_msm),
