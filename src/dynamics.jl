@@ -167,8 +167,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         du_vac.x[1][8, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
-        #Calculate actual recoveries and score errors
-        new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
+        #Calculate actual onsets, generate observed cases and score errors        new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         if wk_num < size(wkly_cases, 1)  # Leave last week out for cross-validation and possible right censoring issues
@@ -218,11 +217,11 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
     old_onsets = [0, 0]
     new_onsets = [0, 0]
-    old_sus = [sum(u0_msm[1, :, :]), u0_other[1]]
-    new_sus = [sum(u0_msm[1, :, :]), u0_other[1]]
+    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
     wk_num = 1
     detected_cases = zeros(size(wkly_cases))
-    incidence = zeros(size(wkly_cases))
+    incidence = zeros(Int64, size(wkly_cases, 1), 11)
     prevalence = zeros(Int64, size(wkly_cases, 1), 11)
     not_changed = true
     not_changed2 = true
@@ -254,12 +253,12 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         du_vac.x[1][8, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
-        #Calculate actual recoveries and score errors
+        #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-        new_sus = [sum(mpx_init.u.x[1][1, :, :]), mpx_init.u.x[2][1]]
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= Float64.(actual_obs)
-        incidence[wk_num, :] = Float64.([old_sus[1] - new_sus[1] - sum(num_vaccines), old_sus[2] - new_sus[2]])
+        incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
         if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
         end

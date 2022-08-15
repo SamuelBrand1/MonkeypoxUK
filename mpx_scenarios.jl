@@ -58,6 +58,12 @@ preds_and_incidence_no_interventions = map((θ, intervention) -> mpx_sim_functio
 preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_vac_ensemble)
 preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_red_ensemble)
 
+
+## Cumulative incidence on week 15 (starting 8th August) for highest frequency group
+cum_inc_wk_15 = [sum(pred[2][1:15,10])./(N_msm*ps[10]) for pred in preds_and_incidence_interventions]
+mean(cum_inc_wk_15)
+quantile(cum_inc_wk_15,[0.25,0.5,0.75])
+
 ##Gather data
 d1, d2 = size(mpxv_wkly)
 
@@ -265,11 +271,17 @@ p_sx_trans_risks = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk
 p_sx_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(p_tr, red_sx_tr, red_sx_tr2, ch1, Inf, ts_risk),
         prob_trans, red_sx_trans, red_sx_trans2, chp1) .|> x -> reshape(x, length(x), 1)
 
+
 sx_trans_risk_cred_int = prev_cred_intervals(p_sx_trans_risks)
 sx_trans_risk_cred_no_int = prev_cred_intervals(p_sx_trans_risks_rwc)
 
 dates = [Date(2021, 12, 31) + Day(t) for t in ts_risk]
 f = findfirst(dates .== Date(2022, 7, 23))
+
+#Posterior probability of >10% decrease in risk
+p_sx_risk_dec = mean([p_trans[f] < p_trans[1]*0.9 for p_trans in p_sx_trans_risks ])
+
+
 
 plt_chng = plot(dates, sx_trans_risk_cred_int.mean_pred,
         ribbon=(sx_trans_risk_cred_int.lb_pred_25, sx_trans_risk_cred_int.ub_pred_25),
@@ -304,6 +316,10 @@ p_oth_trans_risks_rwc = map((p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans
 
 oth_sx_trans_risk_cred_int = prev_cred_intervals(p_oth_trans_risks)
 oth_trans_risk_cred_no_int = prev_cred_intervals(p_oth_trans_risks_rwc)
+
+#Posterior probability of >10% decrease in risk
+p_oth_risk_dec = mean([p_trans[f] < p_trans[1]*0.9 for p_trans in p_oth_trans_risks ])
+
 
 plt_chng_oth = plot(dates, oth_sx_trans_risk_cred_int.mean_pred,
         ribbon=(oth_sx_trans_risk_cred_int.lb_pred_25, oth_sx_trans_risk_cred_int.ub_pred_25),
