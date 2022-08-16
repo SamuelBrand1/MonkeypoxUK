@@ -167,7 +167,8 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         du_vac.x[1][8, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
-        #Calculate actual onsets, generate observed cases and score errors        new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
+        #Calculate actual onsets, generate observed cases and score errors        
+        new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         if wk_num < size(wkly_cases, 1)  # Leave last week out for cross-validation and possible right censoring issues

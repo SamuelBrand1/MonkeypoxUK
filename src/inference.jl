@@ -29,7 +29,7 @@ function simulation_based_calibration(prior_vect, wks, mpxv_wkly, constants; sav
     mbc_errs = map(n -> MonkeypoxUK.mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
 
     ##Find target tolerance and plot error distribution
-    ϵ_target = find_zero(x -> target_perc - sum(mbc_errs .< x) / length(mbc_errs), (0, 2))
+    ϵ_target = find_zero(x -> target_perc - sum(mbc_errs .< x) / length(mbc_errs), (0, 5))
     err_hist = histogram(mbc_errs, norm=:pdf, nbins=500,
         lab="",
         title="Sampled errors from simulations with exact parameters",
