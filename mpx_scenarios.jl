@@ -10,7 +10,7 @@ include("setup_model.jl");
 
 ##Load posterior draws
 
-param_draws = load("posteriors/posterior_param_draws_2022-08-08.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-08-15.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
@@ -178,7 +178,7 @@ total_cases = sum(mpxv_wkly, dims=1)
 plt_cm_msm = plot(; ylabel="Cumulative cases",
         title="UK Monkeypox cumulative case projections (MSM)",#yscale=:log10,
         legend=:topleft,
-        yticks=(0:2500:12500, 0:2500:12500),
+        yticks=(0:2500:12500, 0:2500:100),
         xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
@@ -250,7 +250,7 @@ plt = plot(plt_msm, plt_nmsm, plt_cm_msm, plt_cm_nmsm,
 display(plt)
 
 
-# savefig(plt, "plots/case_projections_" * string(wks[9]) * ".png")
+savefig(plt, "plots/case_projections_" * string(wks[end]) * ".png")
 # savefig(plt, "plots/case_projections_ukhsa.png")
 
 

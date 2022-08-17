@@ -9,7 +9,7 @@ include("setup_model.jl");
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-08.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-15.jld2")
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters

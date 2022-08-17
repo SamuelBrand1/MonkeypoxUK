@@ -88,7 +88,7 @@ savefig(plt, "plots/sexual_activity_groups.png")
 ingroup = 0.99
 n_cliques = 50
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
-wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 13)] * 1.5 #shifted one week to account for delay between jab and effect
+wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.5 #shifted one week to account for delay between jab and effect
 constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, α_incubation_eff, n_cliques, wkly_vaccinations, 0.8, 204] #Constant values passed to the MPX model
 
 ## Check model runs
