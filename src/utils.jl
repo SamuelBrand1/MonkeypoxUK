@@ -20,7 +20,7 @@ function cred_intervals(preds)
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- mean_pred
     ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- mean_pred
-    return (; mean_pred, median_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+    return (mean_pred=mean_pred, median_pred=median_pred, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025)
 end
 
 """
@@ -51,7 +51,7 @@ function prev_cred_intervals(preds)
     lb_pred_025 .= mean_pred .- lb_pred_025
     ub_pred_25 .= ub_pred_25 .- mean_pred
     ub_pred_025 .= ub_pred_025 .- mean_pred
-    return (; median_pred, mean_pred, lb_pred_025, lb_pred_25, ub_pred_25, ub_pred_025)
+    return (median_pred=median_pred, mean_pred=mean_pred, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025)
 end
 
 """

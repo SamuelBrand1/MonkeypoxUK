@@ -66,7 +66,7 @@ function generate_scenario_projections(param_draws, wks, mpxv_wkly, constants)
     preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_vac_ensemble)
     preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_red_ensemble)
 
-    return (; preds_and_incidence_interventions, preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans)
+    return (preds_and_incidence_interventions=preds_and_incidence_interventions, preds_and_incidence_no_interventions=preds_and_incidence_no_interventions, preds_and_incidence_no_vaccines=preds_and_incidence_no_vaccines, preds_and_incidence_no_redtrans=preds_and_incidence_no_redtrans)
 end
 """
     function plot_case_projections(predictions, wks, mpxv_wkly; savefigure=true)

@@ -8,6 +8,7 @@ UK_mpxv_data = mpxv_data[[c ∈ ["England", "Wales", "Scotland", "Northern Irela
 sum(ismissing.(UK_mpxv_data.Date_confirmation)) # 0
 sum(ismissing.(UK_mpxv_data.Date_onset)) #2429
 idxs_confirmed = UK_mpxv_data.Status .== "confirmed"
+
 ##Create weekly report data
 reported_msm_prop = [Date(2022,6,22) 0.96
                         Date(2022,7,6) 0.962;
