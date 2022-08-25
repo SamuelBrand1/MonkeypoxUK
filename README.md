@@ -2,6 +2,8 @@
 
 The `MonkeypoxUK` module provides methods for simulating MPX spread among men-who-have-sex-with-men (MSM) in the United Kingdom as well as the wider community. Weekly case data is from a combination of [ourworldindata](https://ourworldindata.org/monkeypox) and [UKHSA technical briefings](https://www.gov.uk/government/publications/monkeypox-outbreak-technical-briefings).
 
+A preprint describing the underlying reasoning and methodology is now available [_The role of vaccination and public awareness in medium-term forecasts of monkeypox incidence in the United Kingdom_](https://www.medrxiv.org/content/10.1101/2022.08.15.22278788v1).
+
 ### Quick start for inference
 
 1. Download [Julia](https://julialang.org/downloads/).
