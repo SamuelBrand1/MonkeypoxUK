@@ -10,7 +10,7 @@ include("setup_model.jl");
 
 ##Load posterior draws
 
-param_draws = load("posteriors/posterior_param_draws_2022-08-15.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-08-22.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
