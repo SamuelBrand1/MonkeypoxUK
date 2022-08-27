@@ -178,7 +178,7 @@ total_cases = sum(mpxv_wkly, dims=1)
 plt_cm_msm = plot(; ylabel="Cumulative cases",
         title="UK Monkeypox cumulative case projections (MSM)",#yscale=:log10,
         legend=:topleft,
-        yticks=(0:2500:12500, 0:2500:100),
+        # yticks=(0:2500:12500, 0:2500:100),
         xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
