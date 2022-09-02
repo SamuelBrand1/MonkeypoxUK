@@ -18,6 +18,6 @@ A preprint describing the underlying reasoning and methodology is now available 
 
 ### Latest case projections for the UK
 <figure>
-<img src="plots/case_projections_2022-08-22.png" alt="Trulli" style="width:100%">
+<img src="plots/case_projections_2022-08-29.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Posterior means and 25-75% posterior probabilities </b></figcaption>
 </figure>

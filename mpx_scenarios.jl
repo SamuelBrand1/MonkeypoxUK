@@ -10,7 +10,7 @@ include("setup_model.jl");
 
 ##Load posterior draws
 
-param_draws = load("posteriors/posterior_param_draws_2022-08-22.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-08-29.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
@@ -59,7 +59,7 @@ preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_int
 preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_red_ensemble)
 
 
-## Cumulative incidence on week 15 (starting 8th August) for highest frequency group
+## Cumulative incidence on week 15 (starting 8th August) for highest frequency group for paper
 cum_inc_wk_15 = [sum(pred[2][1:15,10])./(N_msm*ps[10]) for pred in preds_and_incidence_interventions]
 mean(cum_inc_wk_15)
 quantile(cum_inc_wk_15,[0.25,0.5,0.75])
@@ -92,8 +92,8 @@ plt_msm = plot(; ylabel="Weekly cases",
         title="UK Monkeypox Case Projections (MSM)",# yscale=:log10,
         legend=:topleft,
         # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
-        # ylims=(0.8, 3001),
-        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
+        ylims=(0.8, 600),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:6], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:6]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
