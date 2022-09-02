@@ -39,7 +39,7 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     α=0.5,
     kernel=gaussiankernel,
     constants=constants,
-    maxiterations=10^10)
+    maxiterations=10^7)
 
 ##Run ABC    
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)#, parallel=true)
