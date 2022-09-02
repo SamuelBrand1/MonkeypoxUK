@@ -13,14 +13,28 @@ function cred_intervals(preds)
     lb_pred_25 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)])
 
+    lb_pred_10 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.10) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.10) for wk in 1:size(preds[1], 1)])
+
     lb_pred_025 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)])
 
     ub_pred_25 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- mean_pred
+
+    ub_pred_10 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.9) for wk in 1:size(preds[1], 1)],
+        [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.9) for wk in 1:size(preds[1], 1)]) .- mean_pred   
+        
     ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
         [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- mean_pred
-    return (mean_pred=mean_pred, median_pred=median_pred, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025)
+    return (mean_pred=mean_pred, 
+            median_pred=median_pred,
+            lb_pred_025=lb_pred_025,
+            lb_pred_10=lb_pred_10,
+            lb_pred_25=lb_pred_25,
+            ub_pred_25=ub_pred_25,
+            ub_pred_10=ub_pred_10,
+            ub_pred_025=ub_pred_025)
 end
 
 """
@@ -36,21 +50,30 @@ function prev_cred_intervals(preds)
     mean_pred = similar(median_pred)
     lb_pred_25 = similar(median_pred)
     lb_pred_025 = similar(median_pred)
+    lb_pred_10 = similar(median_pred)
     ub_pred_25 = similar(median_pred)
     ub_pred_025 = similar(median_pred)
+    ub_pred_10 = similar(median_pred)
+
     for i = 1:d1, j = 1:d2
         v = [preds[n][i, j] for n = 1:num]
         median_pred[i, j] = median(v)
         mean_pred[i, j] = mean(v)
         lb_pred_25[i, j] = quantile(v, 0.25)
         lb_pred_025[i, j] = quantile(v, 0.025)
+        lb_pred_10[i, j] = quantile(v, 0.1)
         ub_pred_25[i, j] = quantile(v, 0.75)
         ub_pred_025[i, j] = quantile(v, 0.975)
+        ub_pred_10[i, j] = quantile(v, 0.9)
     end
     lb_pred_25 .= mean_pred .- lb_pred_25
     lb_pred_025 .= mean_pred .- lb_pred_025
+    lb_pred_10 .= mean_pred .- lb_pred_10
+
     ub_pred_25 .= ub_pred_25 .- mean_pred
     ub_pred_025 .= ub_pred_025 .- mean_pred
+    ub_pred_10 .= ub_pred_10 .- mean_pred
+
     return (median_pred=median_pred, mean_pred=mean_pred, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025)
 end
 
