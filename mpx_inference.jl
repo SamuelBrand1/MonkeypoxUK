@@ -22,8 +22,10 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Uniform(135, 199),# chp_t 8
     Beta(1.5, 1.5),#trans_red 9
     Beta(1.5, 1.5),#trans_red_other 10
-    Beta(1, 4),#trans_red WHO  11
-    Beta(1, 4)]#trans_red_other WHO 12
+    Beta(1.5,1.5),#trans_red WHO  11 
+    Beta(1.5,1.5)]#trans_red_other WHO 12
+    # Beta(1, 4),#trans_red WHO  11 
+    # Beta(1, 4)]#trans_red_other WHO 12
 
 
 ## Use SBC for defining the ABC error target and generate prior predictive plots

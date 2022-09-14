@@ -2,6 +2,7 @@ using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
 using JLD2, MCMCChains
+using MonkeypoxUK
 
 ## Grab UK data and setup model
 include("mpxv_datawrangling.jl");
@@ -33,6 +34,9 @@ val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X ->
 chn = Chains(val_mat, param_names)
 
 write("posteriors/posterior_chain_" * string(wks[end]) * ".jls", chn)
+
+##Calculate orignal R₀ and latested R(t)
+@show chn
 
 ##
 prior_tuple = smc.setup.prior.distribution
