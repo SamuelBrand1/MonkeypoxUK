@@ -86,7 +86,7 @@ seq_proj_nmsm = plot(; ylabel="Weekly cases",
         legend=:topleft,
         # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
         ylims=(-5, 200),
-        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:5], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:5]),
+        xticks=([Date(2022, 5, 1) + Month(k) for k = 0:6], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:6]),
         left_margin=5mm,
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
