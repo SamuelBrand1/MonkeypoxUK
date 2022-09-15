@@ -171,7 +171,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
-        if wk_num < size(wkly_cases, 1)  # Leave last week out for cross-validation and possible right censoring issues
+        if wk_num < size(wkly_cases, 1) && wk_num >= 3  # Leave last week out for cross-validation and possible right censoring issues and leave out first two weeks
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
         wk_num += 1
