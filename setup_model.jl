@@ -1,3 +1,9 @@
+
+## Use inferred MSM data
+wks = wks_inff
+mpxv_wkly = mpxv_wkly_inff
+
+
 ## UK group sizes
 
 N_uk = 67.22e6
