@@ -1,6 +1,6 @@
 # MonkeypoxUK
 
-The `MonkeypoxUK` module provides methods for simulating MPX spread among men-who-have-sex-with-men (MSM) in the United Kingdom as well as the wider community. Weekly case data is from a combination of [ourworldindata](https://ourworldindata.org/monkeypox) and [UKHSA technical briefings](https://www.gov.uk/government/publications/monkeypox-outbreak-technical-briefings).
+The `MonkeypoxUK` module provides methods for simulating MPX spread among men-who-have-sex-with-men (MSM) in the United Kingdom as well as the wider community. Weekly case data is from a combination of [Global.Health/ourworldindata](https://ourworldindata.org/monkeypox) and [UKHSA technical briefings](https://www.gov.uk/government/publications/monkeypox-outbreak-technical-briefings).
 
 A preprint describing the underlying reasoning and methodology is now available [_The role of vaccination and public awareness in medium-term forecasts of monkeypox incidence in the United Kingdom_](https://www.medrxiv.org/content/10.1101/2022.08.15.22278788v1).
 
@@ -18,7 +18,7 @@ A preprint describing the underlying reasoning and methodology is now available 
 
 ### Latest case projections for the UK
 <figure>
-<img src="plots/case_projections_2022-08-29.png" alt="Trulli" style="width:100%">
+<img src="plots_globalhealth/case_projections_2022-08-29.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Posterior means and 10-90% posterior probabilities </b></figcaption>
 </figure>
 

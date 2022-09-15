@@ -10,6 +10,9 @@ import MonkeypoxUK
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
 
+## Use inferred MSM data
+wks = wks_inff
+mpxv_wkly = mpxv_wkly_inff
 ## Define priors for the parameters
 
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
@@ -18,7 +21,7 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(1, 9), #p_trans  4
     LogNormal(log(0.75), 0.25), #R0_other 5
     Gamma(3, 10 / 3),#  M 6
-    LogNormal(0, 1),#init_scale 7
+    LogNormal(log(17), 1),#init_scale 7
     Uniform(135, 199),# chp_t 8
     Beta(1.5, 1.5),#trans_red 9
     Beta(1.5, 1.5),#trans_red_other 10
@@ -29,7 +32,7 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
 
 
 ## Use SBC for defining the ABC error target and generate prior predictive plots
-ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants)
+ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants; target_perc=0.025)
 
 setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     12, # number of parameters
@@ -38,7 +41,7 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     ϵ1=1000,
     convergence=0.05,
     nparticles=2000,
-    α=0.5,
+    α=0.3,
     kernel=gaussiankernel,
     constants=constants,
     maxiterations=10^7)
@@ -57,11 +60,7 @@ plt = plot(; ylabel="Weekly cases",
     title="Posterior predictive checking")
 for pred in post_preds
 
-    plot!(plt, wks, pred, lab="", color=[1 2], alpha=0.3)
+    plot!(plt, wks_inff, pred, lab="", color=[1 2], alpha=0.3)
 end
-scatter!(plt, wks, mpxv_wkly, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
+scatter!(plt, wks_inff, mpxv_wkly_inff, lab=["Data: (MSM)" "Data: (non-MSM)"],ylims = (0,800))
 display(plt)
-
-
-
-

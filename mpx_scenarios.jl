@@ -7,10 +7,12 @@ using MonkeypoxUK
 ## Grab UK data and model set up
 include("mpxv_datawrangling.jl");
 include("setup_model.jl");
-
+## Use inferred MSM data
+wks = wks_inff
+mpxv_wkly = mpxv_wkly_inff
 ##Load posterior draws
 
-param_draws = load("posteriors/posterior_param_draws_2022-08-29.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-08-26.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
