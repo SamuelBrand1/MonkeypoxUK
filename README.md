@@ -23,3 +23,7 @@ A preprint describing the underlying reasoning and methodology is now available 
 </figure>
 
 *NB: For the latest (29th August) projections we have swapped from 25-75% prediction intervals to 10-90% prediction intervals.*
+
+### Method Update [15-09-2022]
+
+We are transitioning to using a method for inferring GBMSM proportion among non-reporting individuals in the UKHSA reporting dataset. For results using the datasets described above (and in linked preprint) please refer to `\plots_globalhealth` and `\posteriors_globalhealth`. 
