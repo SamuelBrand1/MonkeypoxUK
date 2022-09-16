@@ -15,8 +15,8 @@ include("setup_model.jl");
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(5, 5), #p_detect  2
     truncated(Gamma(3, 6 / 3), 0, 21), #mean_inf_period - 1  3
-    Beta(1, 9), #p_trans  4
-    LogNormal(log(0.75), 0.25), #R0_other 5
+    Beta(2, 8), #p_trans  4
+    LogNormal(log(0.25), 0.25), #R0_other 5
     Gamma(3, 100 / 3),#  M 6
     LogNormal(log(5), 1),#init_scale 7
     Uniform(135, 199),# chp_t 8
@@ -45,7 +45,7 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
 
 ##Run ABC    
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[end])*"_vs1.jld2", smc_cng_pnt)
+@save("posteriors/smc_posterior_draws_"*string(wks[end])*"_vs2.jld2", smc_cng_pnt)
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_param_draws_"*string(wks[end])*".jld2", param_draws)
 
