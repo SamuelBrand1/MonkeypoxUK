@@ -17,14 +17,11 @@ import MonkeypoxUK
 end
 ## Grab UK data
 @everywhere begin
-include("mpxv_datawrangling.jl");
+include("mpxv_datawrangling_inff.jl");
 include("setup_model.jl");
 end
-## Use inferred MSM data
-@everywhere begin
-wks = wks_inff
-mpxv_wkly = mpxv_wkly_inff
-end
+
+
 ## Define priors for the parameters
 @everywhere begin
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
@@ -44,7 +41,7 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
 
 end
 ## Use SBC for defining the ABC error target and generate prior predictive plots
-ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants; target_perc=0.05)
+ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(prior_vect_cng_pnt, wks, mpxv_wkly, constants; target_perc=0.25)
 
 
 setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
@@ -53,7 +50,7 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1=1000,
     convergence=0.05,
-    nparticles=1000,
+    nparticles=500,
     α=0.3,
     kernel=gaussiankernel,
     constants=constants,
@@ -72,7 +69,7 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
     α=0.3,
     kernel=gaussiankernel,
     constants=constants,
-    maxiterations=10^6)
+    maxiterations=10^7)
 
     return runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)
 end

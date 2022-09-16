@@ -22,16 +22,16 @@ for r = 1:8
     p = r / mean(d_incubation)
     negbin_std[r] = std(NegativeBinomial(r, p))
 end
-plt_incfit = bar(negbin_std,
-    title="Discrete time model vs data-driven model for incubation",
-    lab="",
-    xticks=1:8,
-    xlabel="Number of stages",
-    ylabel="Std. incubation (days)",
-    size=(800, 600), left_margin=5mm)
-hline!(plt_incfit, [std(d_incubation)], lab="std. data-driven model")
-display(plt_incfit)
-savefig(plt_incfit, "plots/incubation_fit.png")
+# plt_incfit = bar(negbin_std,
+#     title="Discrete time model vs data-driven model for incubation",
+#     lab="",
+#     xticks=1:8,
+#     xlabel="Number of stages",
+#     ylabel="Std. incubation (days)",
+#     size=(800, 600), left_margin=5mm)
+# hline!(plt_incfit, [std(d_incubation)], lab="std. data-driven model")
+# display(plt_incfit)
+# savefig(plt_incfit, "plots/incubation_fit.png")
 #Optimal choice is 4 stages with effective rate to match the mean
 p_incubation = 4 / mean(d_incubation)
 α_incubation_eff = -log(1 - p_incubation)
@@ -62,26 +62,26 @@ xs_pairs = [(xs[i], xs[i+1]) for i = 1:(length(xs)-1)]
 mean_daily_cnts = map(x -> (α_scaling / (α_scaling - 1)) * (x[1]^(1 - α_scaling) - x[2]^(1 - α_scaling)) / (x[1]^(-α_scaling) - x[2]^(-α_scaling)), xs_pairs) .|> x -> x / 365.25
 
 ##Plot sexual contact groups
-plt_ps = bar(ps,
-    yscale=:log10,
-    title="Proportion MSM in each group",
-    xticks=1:10,
-    ylabel="Proportion",
-    xlabel="Sexual activity group",
-    lab="")
-plt_μs = bar(mean_daily_cnts,
-    yscale=:log10,
-    title="Mean daily contact rates in each group",
-    xticks=1:10,
-    ylabel="Rate (days)",
-    xlabel="Sexual activity group",
-    lab="")
-hline!(plt_μs, [1 / 31], lab="Vac. threshold", lw=3, legend=:topleft)
-plt = plot(plt_ps, plt_μs,
-    size=(1000, 400),
-    bottom_margin=5mm, left_margin=5mm)
-display(plt)
-savefig(plt, "plots/sexual_activity_groups.png")
+# plt_ps = bar(ps,
+#     yscale=:log10,
+#     title="Proportion MSM in each group",
+#     xticks=1:10,
+#     ylabel="Proportion",
+#     xlabel="Sexual activity group",
+#     lab="")
+# plt_μs = bar(mean_daily_cnts,
+#     yscale=:log10,
+#     title="Mean daily contact rates in each group",
+#     xticks=1:10,
+#     ylabel="Rate (days)",
+#     xlabel="Sexual activity group",
+#     lab="")
+# hline!(plt_μs, [1 / 31], lab="Vac. threshold", lw=3, legend=:topleft)
+# plt = plot(plt_ps, plt_μs,
+#     size=(1000, 400),
+#     bottom_margin=5mm, left_margin=5mm)
+# display(plt)
+# savefig(plt, "plots/sexual_activity_groups.png")
 
 
 ## Set up for ABC
