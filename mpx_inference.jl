@@ -7,12 +7,9 @@ using JLD2, MCMCChains, Roots
 import MonkeypoxUK
 
 ## Grab UK data
-include("mpxv_datawrangling.jl");
+include("mpxv_datawrangling_inff.jl");
 include("setup_model.jl");
 
-## Use inferred MSM data
-wks = wks_inff
-mpxv_wkly = mpxv_wkly_inff
 
 ## Define priors for the parameters
 prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
@@ -20,7 +17,7 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     truncated(Gamma(3, 6 / 3), 0, 21), #mean_inf_period - 1  3
     Beta(1, 9), #p_trans  4
     LogNormal(log(0.75), 0.25), #R0_other 5
-    Gamma(3, 10 / 3),#  M 6
+    Gamma(3, 100 / 3),#  M 6
     LogNormal(log(5), 1),#init_scale 7
     Uniform(135, 199),# chp_t 8
     Beta(1.5, 1.5),#trans_red 9
@@ -54,6 +51,18 @@ param_draws = [particle.params for particle in smc_cng_pnt.particles]
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
+setup = ABCRejection(MonkeypoxUK.mpx_sim_function_chp, #simulation function
+  12, # number of parameters
+  ϵ_target, #target ϵ
+  Prior(prior_vect_cng_pnt); # Prior for each of the parameters
+  maxiterations = 10^6, #Maximum number of iterations before the algorithm terminates
+  nparticles = 10,
+  constants=constants)
+
+## run ABC inference
+rejection = runabc(setup, mpxv_wkly, verbose=true, progress=true)
+
+##
 
 post_preds = [part.other for part in smc_cng_pnt.particles]
 plt = plot(; ylabel="Weekly cases",

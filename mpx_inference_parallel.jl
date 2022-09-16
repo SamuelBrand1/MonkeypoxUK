@@ -84,6 +84,14 @@ smcs = pmap(run_smc_with_target,fill(ϵ_target,2))
 param_draws = [[particle.params for particle in smcs[1].particles];[particle.params for particle in smcs[2].particles]]
 @save("posteriors/posterior_param_draws_"*string(wks[end])*".jld2", param_draws)
 
+##
+
+smcs = load("posteriors/smcs.jld2")["smcs"]
+param_draws = [[particle.params for particle in smcs[1].particles];[particle.params for particle in smcs[2].particles]]
+@save("posteriors/posterior_param_draws_"*string(wks[end])*".jld2", param_draws)
+
+
+
 
 ##Run ABC    
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=false)
