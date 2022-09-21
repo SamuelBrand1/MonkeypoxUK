@@ -300,23 +300,23 @@ plt_cm_nmsm = plot(; ylabel="Cumulative cases",
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=17, guidefont=18, legendfont=11)
 
-        plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1],
-        ribbon=(cred_int_cum_incidence12wks.lb_pred_10[:, 1], cred_int_cum_incidence12wks.ub_pred_10[:, 1]),
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2],
+        ribbon=(cred_int_cum_incidence12wks.lb_pred_10[:, 2], cred_int_cum_incidence12wks.ub_pred_10[:, 2]),
         lw=3,
         color=:black, fillalpha=0.2, lab="12 week reversion")
 
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1],
-        ribbon=(cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 1], cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 1]),
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2],
+        ribbon=(cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 2], cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 2]),
         lw=3, ls=:dash,
         color=:black, fillalpha=0.2, lab="12 week reversion (vaccine rollout ceases)")
 
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1],
-        ribbon=(cred_int_cum_incidence4wks.lb_pred_10[:, 1], cred_int_cum_incidence4wks.ub_pred_10[:, 1]),
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2],
+        ribbon=(cred_int_cum_incidence4wks.lb_pred_10[:, 2], cred_int_cum_incidence4wks.ub_pred_10[:, 2]),
         lw=3,
         color=2, fillalpha=0.2, lab="4 week reversion")
 
-plot!(plt_cm_msm, long_wks[((d1+1)):end], total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1],
-        ribbon=(cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 1], cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 1]),
+plot!(plt_cm_nmsm, long_wks[((d1+1)):end], total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2],
+        ribbon=(cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 2], cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 2]),
         lw=3, ls=:dash,
         color=2, fillalpha=0.2, lab="4 week reversion (vaccine rollout ceases)")
 
