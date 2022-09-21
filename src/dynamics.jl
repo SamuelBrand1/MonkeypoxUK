@@ -273,3 +273,106 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
 
     return L1_rel_err, detected_cases, incidence, prevalence
 end
+
+"""
+    function mpx_sim_function_interventions(params, constants, wkly_cases, interventions, weeks_to_reversion)
+
+Forecasting/scenario projection simulation function. Compared to main simulation function `mpx_sim_function_chp`, this takes in a richer 
+    set of interventions, encoded in an `interventions` object. Outputs a richer set of observables. The number of weeks to revert probability of transmission
+    to its initial estimate is given by `weeks_to_reversion`.     
+"""
+function mpx_sim_function_interventions(params, constants, wkly_cases, interventions, weeks_to_reversion)
+    #Get constant data
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
+
+    #Get intervention data
+    chp_t2 = interventions.chp_t2
+    wkly_vaccinations = interventions.wkly_vaccinations
+    trans_red2 = interventions.trans_red2
+    inf_duration_red = interventions.inf_duration_red
+    vac_effectiveness = interventions.vac_effectiveness
+    trans_red_other2 = interventions.trans_red_other2
+
+    #Get parameters and make transformations
+    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
+
+    p_γ = 1 / (1 + mean_inf_period)
+    γ_eff = -log(1 - p_γ) #get recovery rate
+    wkly_reversion = exp(-(log(1 - trans_red) + log(1 - trans_red2))/weeks_to_reversion)
+    wkly_reversion_othr = exp(-(log(1 - trans_red_other) + log(1 - trans_red_other2))/weeks_to_reversion)
+
+
+    #Generate random population structure
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
+    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+
+    #Simulate and track error
+    L1_rel_err = 0.0
+    total_cases = sum(wkly_cases[1:end-1, :])
+    u_mpx = ArrayPartition(u0_msm, u0_other)
+    _p = copy([p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
+    prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
+        u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
+        _p)
+    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    old_onsets = [0, 0]
+    new_onsets = [0, 0]
+    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    wk_num = 1
+    detected_cases = zeros(size(wkly_cases))
+    incidence = zeros(Int64, size(wkly_cases, 1), 11)
+    prevalence = zeros(Int64, size(wkly_cases, 1), 11)
+    not_changed = true
+    not_changed2 = true
+
+
+    while wk_num <= size(wkly_cases, 1) #Step forward a week
+        #Change points
+        if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
+            not_changed = false
+            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
+            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce non-sexual transmission after the change point
+        end
+        if not_changed2 && mpx_init.t > chp_t2 ##2nd change point for transmission 
+            not_changed2 = false
+            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
+            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
+            p_γ = 1 / (1 + (mean_inf_period * (1 - inf_duration_red)))
+            mpx_init.p[3] = -log(1 - p_γ) #Reduce duration of transmission after the change point
+        end
+        #Step forward a week in time and implement reversion to normal transmission
+        step!(mpx_init, 7)
+        if wk_num >= 19 && mpx_init.p[1] < p_trans  #Reversion starts first week in September
+            mpx_init.p[1] *= wkly_reversion
+            mpx_init.p[2] *= wkly_reversion_othr
+        end
+
+        #Do vaccine uptake
+        nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
+        du_vac = deepcopy(mpx_init.u)
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
+        num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
+        du_vac.x[1][1, 3:end, :] .-= num_vaccines
+        du_vac.x[1][8, 3:end, :] .+= num_vaccines
+        set_u!(mpx_init, du_vac) #Change the state of the model
+
+        #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
+        new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
+        actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
+        detected_cases[wk_num, :] .= Float64.(actual_obs)
+        incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
+        if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
+            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
+        end
+        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][2:6, n, :]) for n = 1:10]; sum(mpx_init.u.x[2][2:6])]
+
+        #Move time forwards one week
+        wk_num += 1
+        old_onsets = new_onsets
+        old_sus = new_sus
+    end
+
+    return L1_rel_err, detected_cases, incidence, prevalence
+end

@@ -7,7 +7,7 @@ prop_men = 0.5
 prop_msm = 0.034 #https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/sexuality/bulletins/sexualidentityuk/2020
 prop_sexual_active = 1 - 0.154 #A dynamic power-law sexual network model of gonorrhoea outbreaks
 
-N_msm = round(Int64, N_uk * prop_men * prop_ovr18 * prop_msm * prop_sexual_active) #~1.5m
+N_msm = round(Int64, N_uk * prop_men * prop_ovr18 * prop_msm * prop_sexual_active) #~760k
 
 ## Incubation period
 
@@ -89,7 +89,7 @@ mean_daily_cnts = map(x -> (α_scaling / (α_scaling - 1)) * (x[1]^(1 - α_scali
 ingroup = 0.99
 n_cliques = 50
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
-wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)]
+wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.5
 constants = [N_uk, N_msm, ps, mean_daily_cnts, ingroup, ts, α_incubation_eff, n_cliques, wkly_vaccinations, 0.8, 204] #Constant values passed to the MPX model
 
 ## Check model runs
