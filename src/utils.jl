@@ -74,7 +74,7 @@ function prev_cred_intervals(preds)
     ub_pred_025 .= ub_pred_025 .- mean_pred
     ub_pred_10 .= ub_pred_10 .- mean_pred
 
-    return (median_pred=median_pred, mean_pred=mean_pred, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025)
+    return (median_pred=median_pred, mean_pred=mean_pred, lb_pred_10 = lb_pred_10, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025, ub_pred_10 = ub_pred_10)
 end
 
 """
