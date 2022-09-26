@@ -13,23 +13,23 @@ include("setup_model.jl");
 # param_draws1 = load("posteriors/posterior_param_draws_2022-08-26_vs1.jld2")["param_draws"]
 # param_draws2 = load("posteriors/posterior_param_draws_2022-08-26_vs2.jld2")["param_draws"]
 param_draws = mapreduce(fn -> load(fn)["param_draws"], vcat, ["posteriors/posterior_param_draws_2022-08-26_vs1.jld2","posteriors/posterior_param_draws_2022-08-26_vs2.jld2"])
-
+# param_draws = load("posteriors/posterior_param_draws_2022-08-26_vs1prc.jld2")["param_draws"]
 ## Public health emergency effect forecasts
 long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
 wkly_vaccinations_ceased = [copy(wkly_vaccinations)[1:length(wks)+1];fill(0,18)]
 
-plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations, 1)], cumsum(wkly_vaccinations),
+plt_vacs = plot([wks[1] + Day(7 * (k - 1)) for k = 1:size(long_wks, 1)], cumsum(wkly_vaccinations)[1:size(long_mpxv_wkly,1)],
         title="Cumulative number of MPX vaccine doses",
         lab="Projection", color=:black, lw=3,# yticks=0:1000:8000,
         ylabel="Cum. doses",
-        xlims = (Date(2022,5,1), Date(2022,12,31)),
+        # xlims = (Date(2022,5,1), Date(2022,12,31)),
         size=(800, 600), left_margin=5mm,
         guidefont=16, tickfont=11, titlefont=18,legendfont = 16,
         legend = :topleft,
         right_margin = 5mm)
 
-plot!(plt_vacs,[wks[1] + Day(7 * (k - 1)) for k = 1:size(wkly_vaccinations_ceased, 1)],cumsum(wkly_vaccinations_ceased),
+plot!(plt_vacs,[wks[1] + Day(7 * (k - 1)) for k = 1:size(long_wks, 1)],cumsum(wkly_vaccinations_ceased)[1:size(long_wks, 1)],
                 lab = "Vaccine ceased scenario",
                 lw = 3,
                 color = :black,
@@ -81,10 +81,10 @@ preds_and_incidence_interventions_cvac_12wkrev = map((θ, intervention) -> mpx_s
 # preds_and_incidence_no_vaccines = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_vac_ensemble)
 # preds_and_incidence_no_redtrans = map((θ, intervention) -> mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4], param_draws, no_red_ensemble)
 
-## Cumulative incidence on week 15 (starting 8th August) for highest frequency group for paper
-cum_inc_wk_15 = [sum(pred[2][1:15,10])./(N_msm*ps[10]) for pred in preds_and_incidence_interventions]
-mean(cum_inc_wk_15)
-quantile(cum_inc_wk_15,[0.25,0.5,0.75])
+## Cumulative incidence on week 12 (Mid July) for highest frequency groups for paper
+cum_inc_wk_12 = [sum(pred[2][1:15,3:10])./sum(N_msm*ps[3:10]) for pred in preds_and_incidence_interventions]
+mean(cum_inc_wk_12)
+@show mean(cum_inc_wk_12),quantile(cum_inc_wk_12,[0.1,0.9])
 
 ##Gather data
 d1, d2 = size(mpxv_wkly)
@@ -502,20 +502,20 @@ plt_prev = plot(_wks[3:end], prev_cred_int_12wkrev.mean_pred[3:end, 1:10] ./ N_m
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
 
-plot!(plt_prev, _wks[(d1+1):end], prev_cred_int_cvac_12wkrev.mean_pred[(d1+1):end, 1:10] ./ N_msm_grp,
+plot!(plt_prev, _wks[(d_proj+1):end], prev_cred_int_cvac_12wkrev.mean_pred[(d_proj+1):end, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         ls=:dash,
         color=:black,
         lab=hcat(["12 week reversion (vaccination ceases)"], fill("", 1, 9)))
 
-plot!(plt_prev, _wks[(d1+1):end], prev_cred_int_4wkrev.mean_pred[(d1+1):end, 1:10] ./ N_msm_grp,
+plot!(plt_prev, _wks[(d_proj+1):end], prev_cred_int_4wkrev.mean_pred[(d_proj+1):end, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         ribbon=(prev_cred_int_4wkrev.lb_pred_10[(d1+1):end, 1:10] ./ N_msm_grp, prev_cred_int_4wkrev.ub_pred_10[(d1+1):end, 1:10] ./ N_msm_grp),
         fillalpha = 0.1,
         color=2,
         lab=hcat(["4 week reversion"], fill("", 1, 9)))
 
-plot!(plt_prev, _wks[(d1+1):end], prev_cred_int_cvac_4wkrev.mean_pred[(d1+1):end, 1:10] ./ N_msm_grp,
+plot!(plt_prev, _wks[(d_proj+1):end], prev_cred_int_cvac_4wkrev.mean_pred[(d_proj+1):end, 1:10] ./ N_msm_grp,
         lw=[j / 1.5 for i = 1:1, j = 1:10],
         color=2, ls = :dash,
         lab=hcat(["4 week reversion (ceased vaccination)"], fill("", 1, 9)))
@@ -554,13 +554,20 @@ plt_prev_overall = plot(_wks[3:end], prev_cred_int_12wkrev.mean_pred[3:end, 11] 
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
 
-plot!(plt_prev_overall, _wks[(d1+1):end], prev_cred_int_cvac_12wkrev.mean_pred[(d1+1):end, 11] ./ (N_uk - N_msm),
-        color=:black, ls=:dash, lw=3, lab="12 week reversion (ceased vaccination)")
+plot!(plt_prev_overall, _wks[(d_proj+1):end], prev_cred_int_cvac_12wkrev.mean_pred[(d_proj+1):end, 11] ./ (N_uk - N_msm),
+        color=:black, 
+        ls=:dash, 
+        lw=3, 
+        lab="12 week reversion (ceased vaccination)")
 
-plot!(plt_prev_overall, _wks[(d1+1):end], prev_cred_int_4wkrev.mean_pred[(d1+1):end, 11] ./ (N_uk - N_msm),
-        color=2, lw=3, lab="4 week reversion")        
+plot!(plt_prev_overall, _wks[(d_proj+1):end], prev_cred_int_4wkrev.mean_pred[(d_proj+1):end, 11] ./ (N_uk - N_msm),
+        ribbon=(prev_cred_int_4wkrev.lb_pred_10[(d_proj+1):end, 11] ./ (N_uk - N_msm), prev_cred_int_4wkrev.ub_pred_10[(d_proj+1):end, 11] ./ (N_uk - N_msm)),
+        color=2, 
+        fillalpha=0.2,
+        lw=3, 
+        lab="4 week reversion")        
 
-plot!(plt_prev_overall, _wks[(d1+1):end], prev_cred_int_cvac_4wkrev.mean_pred[(d1+1):end, 11] ./ (N_uk - N_msm),
+plot!(plt_prev_overall, _wks[(d_proj+1):end], prev_cred_int_cvac_4wkrev.mean_pred[(d_proj+1):end, 11] ./ (N_uk - N_msm),
         color=2, ls=:dash, lw=3, lab="4 week reversion (ceased vaccination)")        
 
 ##
