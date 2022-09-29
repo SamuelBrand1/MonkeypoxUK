@@ -27,3 +27,7 @@ A preprint describing the underlying reasoning and methodology is now available 
 ### Method Update [15-09-2022]
 
 We are transitioning to using a method for inferring GBMSM proportion among non-reporting individuals in the UKHSA reporting dataset. For results using the datasets described above (and in linked preprint) please refer to `\plots_globalhealth` and `\posteriors_globalhealth`. 
+
+### Data update [26-09-2022]
+
+The data set from Global.Health has now depreciated.

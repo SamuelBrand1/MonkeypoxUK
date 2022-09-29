@@ -4,14 +4,24 @@ using OrdinaryDiffEq, ApproxBayes
 using JLD2, MCMCChains
 using MonkeypoxUK
 using ColorSchemes
-## Grab UK data and setup model
-include("mpxv_datawrangling.jl");
+## Grab UK data and model set up
+include("mpxv_datawrangling_inff.jl");
 include("setup_model.jl");
+
+## Comment out to use latest data rather than reterospective data
+
+colname = "seqn_fit4"
+inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
+mpxv_wkly =
+    Matrix(past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]]) .+
+    Vector(past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"]) .*
+    hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm)
+wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
 
 ## Generate an ensemble of forecasts
 
-seq_wks = [wks[1:5], wks[1:9], wks[1:13],wks[1:17], wks]
-seq_mpxv_wklys = [mpxv_wkly[1:5, :], mpxv_wkly[1:9, :], mpxv_wkly[1:13, :], mpxv_wkly[1:17, :], mpxv_wkly]
+seq_wks = [wks[1:8], wks[1:12], wks[1:16], wks]
+seq_mpxv_wklys = [mpxv_wkly[1:8, :], mpxv_wkly[1:12, :], mpxv_wkly[1:16, :], mpxv_wkly]
 
 function load_smc(wks)
     wk = wks[end]
@@ -32,6 +42,24 @@ long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
 long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
 
 ##
+"""
+function add_seqn_forecast!(plt, n; msm::Bool, N=4)
+
+Add the `n` the sequential prediction curve to the plot.    
+"""
+function add_seqn_forecast!(plt, n; msm::Bool, N=4)
+    period = (length(seq_wks[n])):(length(seq_wks[n])+11)
+    k = msm ? 1 : 2
+    plot!(plt,long_wks[period],seq_creds[n].mean_pred[period, k], color=get(ColorSchemes.cool,n/N),
+    ribbon=(seq_creds[n].lb_pred_10[period, k], seq_creds[n].ub_pred_10[period, k]),
+    fillalpha = 0.3, legend = :topleft,lab = seq_wks[n][end],lw = 0)
+
+    plot!(plt,long_wks[period],seq_creds[n].mean_pred[period, k], color=get(ColorSchemes.cool,n/N),
+    lab = "",lw = 3)
+end
+
+
+##
 
 seq_proj_msm = plot(; ylabel="Weekly cases",
         title="UK Monkeypox Sequential Projections (MSM)",# yscale=:log10,
@@ -44,40 +72,15 @@ seq_proj_msm = plot(; ylabel="Weekly cases",
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
 
 
-plot!(seq_proj_msm,long_wks[5:17],seq_creds[1].mean_pred[5:17, 1], color=get(ColorSchemes.cool,5/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[1].lb_pred_10[5:17, 1], seq_creds[1].ub_pred_10[5:17, 1]),
-    fillalpha = 0.3, legend = :topleft,lab = seq_wks[1][end],lw = 0)
-plot!(seq_proj_msm,long_wks[9:21],seq_creds[2].mean_pred[9:21, 1], color=get(ColorSchemes.cool,9/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[2].lb_pred_10[9:21, 1], seq_creds[2].ub_pred_10[9:21, 1]),
-    fillalpha=0.3, lab=seq_wks[2][end],lw = 0)
-plot!(seq_proj_msm,long_wks[13:25],seq_creds[3].mean_pred[13:25, 1], color=get(ColorSchemes.cool,13/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[3].lb_pred_10[13:25, 1], seq_creds[3].ub_pred_10[13:25, 1]),
-    fillalpha=0.3, lab=seq_wks[3][end],lw = 0)
-plot!(seq_proj_msm,long_wks[17:29],seq_creds[4].mean_pred[17:29, 1], color=get(ColorSchemes.cool,17/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[4].lb_pred_10[17:29, 1], seq_creds[4].ub_pred_10[17:29, 1]),
-    fillalpha=0.3, lab=seq_wks[4][end],lw = 0)    
-plot!(seq_proj_msm,long_wks[18:30],seq_creds[5].mean_pred[18:30, 1], color=get(ColorSchemes.cool,18/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[5].lb_pred_10[18:30, 1], seq_creds[5].ub_pred_10[18:30, 1]),
-    fillalpha=0.3, lab=seq_wks[5][end],lw = 0) 
-
-
-plot!(seq_proj_msm,long_wks[5:17],seq_creds[1].mean_pred[5:17, 1], color=get(ColorSchemes.cool,5/size(mpxv_wkly,1)),
-    lab = "",lw = 3)
-plot!(seq_proj_msm,long_wks[9:21],seq_creds[2].mean_pred[9:21, 1], color=get(ColorSchemes.cool,9/size(mpxv_wkly,1)),
-    lab="",lw = 3)
-plot!(seq_proj_msm,long_wks[13:25],seq_creds[3].mean_pred[13:25, 1], color=get(ColorSchemes.cool,13/size(mpxv_wkly,1)),
-    lab="",lw = 3)
-plot!(seq_proj_msm,long_wks[17:29],seq_creds[4].mean_pred[17:29, 1], color=get(ColorSchemes.cool,17/size(mpxv_wkly,1)),
-    lab="",lw = 3)  
-    
-plot!(seq_proj_msm,long_wks[18:30],seq_creds[5].mean_pred[18:30, 1], color=get(ColorSchemes.cool,18/size(mpxv_wkly,1)),
-    lab="",lw = 3)      
-# plot!(15:27,seq_creds[4].mean_pred[15:27, 1], color=get(ColorSchemes.cool,15/size(mpxv_wkly,1)),
-#     lab="",lw = 3)    
-# scatter!(mpxv_wkly[1:end-1,1],color = :black,lab= "Data")
-scatter!(seq_proj_msm,wks[1:(end-1)],mpxv_wkly[1:(end-1), 1],
+for n = 1:4
+    add_seqn_forecast!(seq_proj_msm,n;msm = true)
+end
+scatter!(seq_proj_msm,wks[1:(end)],mpxv_wkly[1:(end), 1],
         lab="Data",
         ms=6, color=:black)
+display(seq_proj_msm)
+
+##
 
 ##
 
@@ -91,41 +94,18 @@ seq_proj_nmsm = plot(; ylabel="Weekly cases",
         size=(800, 600), dpi=250,
         tickfont=11, titlefont=18, guidefont=18, legendfont=11)
 
-plot!(seq_proj_nmsm,long_wks[5:17],seq_creds[1].mean_pred[5:17, 2], color=get(ColorSchemes.cool,5/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[1].lb_pred_10[5:17, 2], seq_creds[1].ub_pred_10[5:17, 2]),
-    fillalpha = 0.3, legend = :topleft,lab = seq_wks[1][end],lw = 0)
-plot!(seq_proj_nmsm,long_wks[9:21],seq_creds[2].mean_pred[9:21, 2], color=get(ColorSchemes.cool,9/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[2].lb_pred_10[9:21, 2], seq_creds[2].ub_pred_10[9:21, 2]),
-    fillalpha=0.3, lab=seq_wks[2][end],lw = 0)
-plot!(seq_proj_nmsm,long_wks[13:25],seq_creds[3].mean_pred[13:25, 2], color=get(ColorSchemes.cool,13/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[3].lb_pred_10[13:25, 2], seq_creds[3].ub_pred_10[13:25, 2]),
-    fillalpha=0.3, lab=seq_wks[3][end],lw = 0)
-plot!(seq_proj_nmsm,long_wks[17:29],seq_creds[4].mean_pred[17:29, 2], color=get(ColorSchemes.cool,17/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[4].lb_pred_10[17:29, 2], seq_creds[4].ub_pred_10[17:29, 2]),
-    fillalpha=0.3, lab=seq_wks[4][end],lw = 0)    
-plot!(seq_proj_nmsm,long_wks[18:30],seq_creds[5].mean_pred[18:30, 2], color=get(ColorSchemes.cool,18/size(mpxv_wkly,1)),
-    ribbon=(seq_creds[5].lb_pred_10[18:30, 2], seq_creds[5].ub_pred_10[18:30, 2]),
-    fillalpha=0.3, lab=seq_wks[5][end],lw = 0) 
+##
 
-
-plot!(seq_proj_nmsm,long_wks[5:17],seq_creds[1].mean_pred[5:17, 2], color=get(ColorSchemes.cool,5/size(mpxv_wkly,1)),
-    lab = "",lw = 3)
-plot!(seq_proj_nmsm,long_wks[9:21],seq_creds[2].mean_pred[9:21, 2], color=get(ColorSchemes.cool,9/size(mpxv_wkly,1)),
-    lab="",lw = 3)
-plot!(seq_proj_nmsm,long_wks[13:25],seq_creds[3].mean_pred[13:25, 2], color=get(ColorSchemes.cool,13/size(mpxv_wkly,1)),
-    lab="",lw = 3)
-plot!(seq_proj_nmsm,long_wks[17:29],seq_creds[4].mean_pred[17:29, 2], color=get(ColorSchemes.cool,17/size(mpxv_wkly,1)),
-    lab="",lw = 3)  
-    
-plot!(seq_proj_nmsm,long_wks[18:30],seq_creds[5].mean_pred[18:30, 2], color=get(ColorSchemes.cool,18/size(mpxv_wkly,1)),
-    lab="",lw = 3)         
-
-# plot!(15:27,seq_creds[4].mean_pred[15:27, 1], color=get(ColorSchemes.cool,15/size(mpxv_wkly,1)),
-#     lab="",lw = 3)    
-# scatter!(mpxv_wkly[1:end-1,1],color = :black,lab= "Data")
-scatter!(seq_proj_nmsm,wks[1:(end-1)],mpxv_wkly[1:(end-1), 2],
+for n = 1:4
+    add_seqn_forecast!(seq_proj_nmsm,n;msm = false)
+end
+scatter!(seq_proj_nmsm,wks[1:(end)],mpxv_wkly[1:(end), 2],
         lab="Data",
-        ms=6, color=:black)        
+        ms=6, color=:black)
+display(seq_proj_nmsm)
+
+
+##        
 
 ##
 

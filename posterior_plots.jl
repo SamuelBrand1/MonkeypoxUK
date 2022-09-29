@@ -1,20 +1,31 @@
 using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
-using OrdinaryDiffEq, ApproxBayes
+using OrdinaryDiffEq, ApproxBayes, CSV, DataFrames
 using JLD2, MCMCChains
 using MonkeypoxUK
 
 ## Grab UK data and setup model
-include("mpxv_datawrangling.jl");
+include("mpxv_datawrangling_inff.jl");
 include("setup_model.jl");
+
+## Comment out to use latest data rather than reterospective data
+
+colname = "seqn_fit4"
+inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
+mpxv_wkly =
+    Matrix(past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]]) .+
+    Vector(past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"]) .*
+    hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm)
+wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
+
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors_globalhealth/smc_posterior_draws_2022-08-29.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-05.jld2")
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
-param_names = [:clique_dispersion, :prob_detect, :mean_inf_period, :prob_transmission,
+param_names = [:metapop_size_dispersion, :prob_detect, :mean_inf_period, :prob_transmission,
     :R0_other, :detect_dispersion, :init_infs, :chg_pnt, :sex_trans_red, :other_trans_red,:sex_trans_red_post_WHO, :other_trans_red_post_WHO]
 
 transformations = [fill(x -> x, 2)
@@ -30,10 +41,12 @@ function col_transformations(X, f_vect)
     return X
 end
 
-val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> hcat(X[:,1:10],X[:,11].*X[:,4],X[:,12].*X[:,5])  |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
+# val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> hcat(X[:,1:10],X[:,11].*X[:,4],X[:,12].*X[:,5])  |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
+val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
+
 chn = Chains(val_mat, param_names)
 
-write("posteriors/posterior_chain_" * string(wks[end]) * ".jls", chn)
+CSV.write("posteriors/posterior_chain_" * string(wks[end]) * ".csv", DataFrame(chn))
 
 ##Calculate orignal R₀ and latest R(t)
 function construct_next_gen_mat(params, constants, susceptible_prop, vac_rates)
@@ -162,13 +175,13 @@ end
 
 ## Calculate the original R0 with next gen matrix method and lastest R(t)
 # R0s = map(θ -> construct_next_gen_mat(θ,constants, [ones(10); zeros(0)], [zeros(10);fill(1.0,0)])[1],param_draws )
-initial_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[2], param_draws)
+# initial_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[2], param_draws)
 
-latest_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[1], param_draws)
+# latest_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[1], param_draws)
 
 @show round(mean(R0s),digits = 2),round.(quantile(R0s,[0.1,0.9]),digits = 2)
 @show round(mean(latest_Rts), digits = 2), round.(quantile(latest_Rts,[0.1,0.9]), digits = 2)
-@show round(mean(initial_Rts[initial_Rts .> 1.0]), digits = 2), round.(quantile(initial_Rts[initial_Rts .> 1.0],[0.1,0.9]), digits = 2)
+@show round(mean(initial_Rts), digits = 2), round.(quantile(initial_Rts[initial_Rts .> 1.0],[0.1,0.9]), digits = 2)
 
 
 
@@ -179,10 +192,10 @@ for j = 1:length(prior_tuple)
     prior_val_mat[:, j] .= rand(prior_tuple[j], 10_000)
 end
 prior_val_mat = col_transformations(prior_val_mat, transformations)
-prior_val_mat[:,11] .= prior_val_mat[:,11].*prior_val_mat[:,4]
-prior_val_mat[:,12] .= prior_val_mat[:,11].*prior_val_mat[:,5]
+# prior_val_mat[:,11] .= prior_val_mat[:,11].*prior_val_mat[:,4]
+# prior_val_mat[:,12] .= prior_val_mat[:,12].*prior_val_mat[:,5]
 ##
-pretty_parameter_names = ["Clique size dispersion",
+pretty_parameter_names = ["Metapop. size dispersion",
     "Prob. of detection",
     "Mean dur. infectious",
     "Prob. trans. per sexual contact",
@@ -236,5 +249,3 @@ crn_plt = corner(chn,
 savefig(crn_plt, "posteriors/post_crnplot" * string(wks[end]) * ".png")
 
 ##
-
-@show chn
