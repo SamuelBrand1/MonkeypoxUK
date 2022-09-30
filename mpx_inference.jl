@@ -12,7 +12,7 @@ include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
 
-colname = "seqn_fit1"
+colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:,colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm,1),["gbmsm","nongbmsm"]] .+ past_mpxv_data_inferred[1:size(inferred_prop_na_msm,1),"na_gbmsm"] .* hcat(inferred_prop_na_msm,1.0 .- inferred_prop_na_msm)  |> Matrix
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly,1)], DateFormat("dd/mm/yyyy"))
