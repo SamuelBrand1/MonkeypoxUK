@@ -12,7 +12,7 @@ include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
 
-colname = "seqn_fit4"
+colname = "seqn_fit1"
 inferred_prop_na_msm = past_mpxv_data_inferred[:,colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm,1),["gbmsm","nongbmsm"]] .+ past_mpxv_data_inferred[1:size(inferred_prop_na_msm,1),"na_gbmsm"] .* hcat(inferred_prop_na_msm,1.0 .- inferred_prop_na_msm)  |> Matrix
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly,1)], DateFormat("dd/mm/yyyy"))
@@ -51,9 +51,9 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
 
 ##Run ABC    
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[end])*"_binom.jld2", smc_cng_pnt)
+@save("posteriors/smc_posterior_draws_"*string(wks[end])*"_binom_bf.jld2", smc_cng_pnt)
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
-@save("posteriors/posterior_param_draws_"*string(wks[end])*"_binom.jld2", param_draws)
+@save("posteriors/posterior_param_draws_"*string(wks[end])*"_binom_bf.jld2", param_draws)
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
