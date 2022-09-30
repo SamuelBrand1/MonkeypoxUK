@@ -26,7 +26,7 @@ wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.55
 # param_draws1 = load("posteriors/posterior_param_draws_2022-08-26_vs1.jld2")["param_draws"]
 # param_draws2 = load("posteriors/posterior_param_draws_2022-08-26_vs2.jld2")["param_draws"]
 # param_draws = mapreduce(fn -> load(fn)["param_draws"], vcat, ["posteriors/posterior_param_draws_2022-08-26_vs1.jld2","posteriors/posterior_param_draws_2022-08-26_vs2.jld2"])
-param_draws = load("posteriors/posterior_param_draws_2022-09-05.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-09-05_binom.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 n_lookaheadweeks = 26
@@ -815,8 +815,11 @@ dates = [Date(2021, 12, 31) + Day(t) for t in ts_risk]
 f = findfirst(dates .== Date(2022, 7, 23))
 
 #Posterior probability of >10% decrease in risk
-# p_sx_risk_dec = mean([p_trans[f] < p_trans[1]*0.9 for p_trans in p_sx_trans_risks ])
+p_sx_risk_pheic = mean([p_trans[f] < p_trans[1]*0.9 for p_trans in p_sx_trans_risks ])
 
+
+sx_cnt_trans_risk = DataFrame()
+sx_cnt_trans_risk[:, "Date"] = dates[dates .>= Date(2022,5,1)]
 
 
 plt_chng = plot(

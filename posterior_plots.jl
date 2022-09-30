@@ -21,7 +21,7 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-05.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-05_binom.jld2")
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
@@ -174,10 +174,10 @@ function generate_Rt_estimate(params, constants, wkly_cases)
 end
 
 ## Calculate the original R0 with next gen matrix method and lastest R(t)
-# R0s = map(θ -> construct_next_gen_mat(θ,constants, [ones(10); zeros(0)], [zeros(10);fill(1.0,0)])[1],param_draws )
-# initial_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[2], param_draws)
+R0s = map(θ -> construct_next_gen_mat(θ,constants, [ones(10); zeros(0)], [zeros(10);fill(1.0,0)])[1],param_draws )
+initial_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[2], param_draws)
 
-# latest_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[1], param_draws)
+latest_Rts = map(θ -> generate_Rt_estimate(θ, constants, mpxv_wkly)[1], param_draws)
 
 @show round(mean(R0s),digits = 2),round.(quantile(R0s,[0.1,0.9]),digits = 2)
 @show round(mean(latest_Rts), digits = 2), round.(quantile(latest_Rts,[0.1,0.9]), digits = 2)
