@@ -57,6 +57,7 @@ param_draws = [particle.params for particle in smc_cng_pnt.particles]
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
+
 post_preds = [part.other for part in smc_cng_pnt.particles]
 plt = plot(; ylabel="Weekly cases",
     title="Posterior predictive checking")
