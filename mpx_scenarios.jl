@@ -11,7 +11,7 @@ include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
 
-colname = "seqn_fit1"
+colname = "seqn_fit4"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -26,7 +26,7 @@ wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.55
 # param_draws1 = load("posteriors/posterior_param_draws_2022-08-26_vs1.jld2")["param_draws"]
 # param_draws2 = load("posteriors/posterior_param_draws_2022-08-26_vs2.jld2")["param_draws"]
 # param_draws = mapreduce(fn -> load(fn)["param_draws"], vcat, ["posteriors/posterior_param_draws_2022-08-26_vs1.jld2","posteriors/posterior_param_draws_2022-08-26_vs2.jld2"])
-param_draws = load("posteriors/posterior_param_draws_2022-09-05_binom.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-09-12_binom_bf.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 n_lookaheadweeks = 26
@@ -447,6 +447,7 @@ scatter!(
 )
 CSV.write("projections/nongbmsm_case_projections.csv", nongbmsm_case_projections)
 display(plt_nmsm)
+
 ##cumulative Incidence plots
 
 cred_int_cum_incidence = MonkeypoxUK.cred_intervals(cum_cases_forwards)
@@ -719,7 +720,7 @@ plt = plot(
 display(plt)
 
 
-savefig(plt, "plots/gbmsm_case_projections_" * string(wks[end]) * ".png")
+savefig(plt, "plots/case_projections_" * string(wks[end]) * ".png")
 # savefig(plt, "plots/gbmsm_case_projections_ukhsa.png")
 
 

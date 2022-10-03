@@ -10,7 +10,7 @@ include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
 
-colname = "seqn_fit4"
+colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     Matrix(past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]]) .+
@@ -21,7 +21,7 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-05_binom.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf.jld2")
 param_draws = [part.params for part in smc.particles]
 
 ##Create transformations to more interpetable parameters
