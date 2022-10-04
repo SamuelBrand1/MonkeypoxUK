@@ -90,9 +90,11 @@ ingroup = 0.99
 n_cliques = 50
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
 # wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.5
+
 wkly_vaccinations = [[zeros(12); 1000; 2000; fill(5000, 4)] * 1.675
-    fill(650, 19)
+    fill(650, 20)
 ]
+
 wkly_vaccinations_ceased = [copy(wkly_vaccinations)[1:length(wks)+1]; fill(0, 52)]
 
 
