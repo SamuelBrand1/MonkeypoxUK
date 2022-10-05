@@ -126,6 +126,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     γ_eff = -log(1 - p_γ) #get recovery rate
     trans_red2 = trans_red * scale_trans_red2
     trans_red_other2 = scale_trans_red2 * scale_red_other2
+
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
@@ -298,10 +299,15 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
 
     p_γ = 1 / (1 + mean_inf_period)
     γ_eff = -log(1 - p_γ) #get recovery rate
-    wkly_reversion = exp(-(log(1 - trans_red) + log(1 - trans_red2))/weeks_to_reversion)
-    wkly_reversion_othr = exp(-(log(1 - trans_red_other) + log(1 - trans_red_other2))/weeks_to_reversion)
+    
+    #Calculate logistic reversion to pre-change
+    p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
+    R_oth_min = R0_other*(1 - trans_red_other)*(1 - trans_red_other2)
+    T₅₀ = (Date(2022,9,1) - Date(2021,12,31)).value + (weeks_to_reversion * 7 / 2) # 50% return to normal point
+    κ = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
-
+    # wkly_reversion = exp(-(log(1 - trans_red) + log(1 - trans_red2))/weeks_to_reversion)
+    # wkly_reversion_othr = exp(-(log(1 - trans_red_other) + log(1 - trans_red_other2))/weeks_to_reversion)
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
@@ -315,6 +321,8 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
         _p)
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+
+    #Set up arrays for tracking epidemiological observables
     old_onsets = [0, 0]
     new_onsets = [0, 0]
     old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
@@ -326,7 +334,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     not_changed = true
     not_changed2 = true
 
-
+    #Step through the dynamics
     while wk_num <= size(wkly_cases, 1) #Step forward a week
         #Change points
         if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
@@ -342,10 +350,15 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
             mpx_init.p[3] = -log(1 - p_γ) #Reduce duration of transmission after the change point
         end
         #Step forward a week in time and implement reversion to normal transmission
-        step!(mpx_init, 7)
-        if wk_num >= 19 && mpx_init.p[1] < p_trans  #Reversion starts first week in September
-            mpx_init.p[1] *= wkly_reversion
-            mpx_init.p[2] *= wkly_reversion_othr
+        # step!(mpx_init, 7)
+        # if wk_num >= 19 && mpx_init.p[1] < p_trans  #Reversion starts first week in September
+        #     mpx_init.p[1] *= wkly_reversion
+        #     mpx_init.p[2] *= wkly_reversion_othr
+        # end
+        for stp = 1:7
+            step!(mpx_init, 1)
+            mpx_init.p[1] += (p_trans - p_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
+            mpx_init.p[2] += (R0_other - R_oth_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
         end
 
         #Do vaccine uptake

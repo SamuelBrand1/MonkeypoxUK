@@ -1,3 +1,7 @@
+function sigmoid(x)
+    1.0 / (1.0 + exp(-x))
+end
+
 """
     function cred_intervals(preds)
 
