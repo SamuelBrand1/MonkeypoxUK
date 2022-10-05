@@ -21,15 +21,17 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf.jld2")
-param_draws = [part.params for part in smc.particles]
+# smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf.jld2")
+# param_draws = [part.params for part in smc.particles]
+param_draws = load("posteriors/posterior_param_draws_2022-09-26_binom_bf.jld2")["param_draws"]
 
 ##Create transformations to more interpetable parameters
 param_names = [:metapop_size_dispersion, :prob_detect, :mean_inf_period, :prob_transmission,
     :R0_other, :detect_dispersion, :init_infs, :chg_pnt, :sex_trans_red, :other_trans_red,:sex_trans_red_post_WHO, :other_trans_red_post_WHO]
 
 transformations = [fill(x -> x, 2)
-    x -> 1 + mean(Geometric(1 / (1 + x))) # Translate the infectious period parameter into mean infectious period
+    # x -> 1 + mean(Geometric(1 / (1 + x))) # Translate the infectious period parameter into mean infectious period
+    x -> x
     fill(x -> x, 2)
     x -> 1 / (x + 1) #Translate "effective sample size" for Beta-Binomial on sampling to overdispersion parameter
     fill(x -> x, 4);
@@ -41,9 +43,10 @@ function col_transformations(X, f_vect)
     return X
 end
 
+param_mat = [p[j] for p in param_draws, j = 1:length(param_names)]
 # val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> hcat(X[:,1:10],X[:,11].*X[:,4],X[:,12].*X[:,5])  |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
-val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
-
+# val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
+val_mat = param_mat|> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
 chn = Chains(val_mat, param_names)
 
 CSV.write("posteriors/posterior_chain_" * string(wks[end]) * ".csv", DataFrame(chn))
@@ -57,7 +60,7 @@ function construct_next_gen_mat(params, constants, susceptible_prop, vac_rates)
     N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2 = constants
 
     #Calculate next gen matrix
-    _A = (ms .* (susceptible_prop .+  (vac_rates .* (1.0 .- vac_effectiveness)))') .* mean_inf_period .* p_trans #Sexual transmission within MSM
+    _A = (ms .* (susceptible_prop .+  (vac_rates .* (1.0 .- vac_effectiveness)))') .* (mean_inf_period .* p_trans ./ length(ms) )  #Sexual transmission within MSM
     A = _A .+ (R0_other/N_uk) .* repeat(ps' .* N_msm,10) #Other routes of transmission MSM -> MSM
     B = (R0_other*(N_uk - N_msm)/N_total) .* ones(10)    # MSM transmission to non MSM
     C = (R0_other/N_uk) .* ps' .* N_msm  #Non-msm transmission to MSM
