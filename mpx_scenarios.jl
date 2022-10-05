@@ -218,8 +218,8 @@ plt_msm = plot(;
     # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
     ylims=(-5, 700),
     xticks=(
-        [Date(2022, 5, 1) + Month(k) for k = 0:12],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:12],
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
     left_margin=5mm,
     size=(800, 600),
@@ -343,8 +343,8 @@ plt_nmsm = plot(;
     # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
     ylims=(-1, 200),
     xticks=(
-        [Date(2022, 5, 1) + Month(k) for k = 0:12],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:12],
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
     left_margin=5mm,
     size=(800, 600),
@@ -1327,3 +1327,140 @@ plt = plot(
 )
 display(plt)
 savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
+
+
+##Cumulative infections
+
+d1, d2 = size(mpxv_wkly)
+
+cuminf_cred_int = prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions])
+cuminf_cred_int_4wkrev =
+    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_4wkrev])
+cuminf_cred_int_12wkrev =
+    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_12wkrev])
+
+cuminf_cred_int_cvac =
+    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_cvac])
+cuminf_cred_int_cvac_4wkrev =
+    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_cvac_4wkrev])
+cuminf_cred_int_cvac_12wkrev = prev_cred_intervals([
+    cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_cvac_12wkrev
+])
+
+cuminf_cred_int_overall = prev_cred_intervals([
+    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for pred in preds_and_incidence_interventions
+])
+cuminf_cred_int_overall_4wkrev = prev_cred_intervals([
+    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for pred in preds_and_incidence_interventions_4wkrev
+])
+
+cuminf_cred_int_overall_12wkrev = prev_cred_intervals([
+    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for pred in preds_and_incidence_interventions_12wkrev
+])
+
+cuminf_cred_int_overall_cvac_4wkrev = prev_cred_intervals([
+    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for
+    pred in preds_and_incidence_interventions_cvac_4wkrev
+])
+
+
+##
+
+N_msm_grp = N_msm .* ps'
+_wks = long_wks .- Day(7)
+
+
+exposure = DataFrame()
+exposure[:, "Dates"] = _wks[3:end]
+
+# plt_cum_infs = plot(
+#     _wks[3:end],
+#     cuminf_cred_int_12wkrev.mean_pred[3:end, 1:10] ./ N_msm_grp,
+#     ribbon=(
+#         cuminf_cred_int_12wkrev.lb_pred_10[3:end, 1:10] ./ N_msm_grp,
+#         cuminf_cred_int_12wkrev.ub_pred_10[3:end, 1:10] ./ N_msm_grp,
+#     ),
+#     lw=[j / 1.5 for i = 1:1, j = 1:10],
+#     lab=hcat(["12 week reversion"], fill("", 1, 9)),
+#     # yticks=(0:0.04:0.36, [string(round(y * 100)) * "%" for y = 0:0.04:0.36]),
+#     xticks=(
+#         [Date(2022, 5, 1) + Month(k) for k = 0:11],
+#         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
+#     ),
+#     ylabel="Cum. infections",
+#     title="MPX exposure by sexual activity group (GBMSM)",
+#     color=:black,
+#     fillalpha=0.1,
+#     left_margin=5mm,
+#     right_margin = 5mm,
+#     size=(800, 600),
+#     dpi=250,
+#     tickfont=13,
+#     titlefont=18,
+#     guidefont=18,
+#     legendfont=11,
+# )
+
+f = findfirst(_wks .>= Date(2022,10,1))
+
+pop_sizes = [(N_uk - N_msm) ; N_msm_grp[:]]
+prop_inf = [cuminf_cred_int.mean_pred[f,11] / (N_uk - N_msm)  ;cuminf_cred_int.mean_pred[f,1:10] ./ N_msm_grp[:]]
+mnthly_cnts = xs ./ 12 .|> x -> round(x,sigdigits = 2) .|> x -> string(x) .|> str -> str[(end-1):end] == ".0" ? str[1:(end-2)] : str
+xtickstr = Vector{String}(undef,10)
+xtickstr[1] = "< " * mnthly_cnts[1]
+for k = 2:9
+    xtickstr[k] = mnthly_cnts[k-1] * "-" * mnthly_cnts[k]
+end
+xtickstr[10] = "> " * mnthly_cnts[10]
+xtickstr = ["non-GBMSM" ; xtickstr]
+
+
+plt_prop = bar(pop_sizes ./ N_uk,
+    yscale=:log10,
+    title="Risk groups and proportions infected (1st Oct)",
+    xticks=(1:11,xtickstr),
+    yticks = [1e-5,1e-4,1e-3,1e-2,1e-1,1],
+    ylabel="Proportion of population",
+    xlabel="Monthly new sexual partners",
+    bar_width = 0.9,
+    size=(1600, 600),
+    dpi = 250,
+    tickfont=15,
+    titlefont=28,
+    guidefont=24,
+    legendfont=16,
+    left_margin = 15mm,
+    bottom_margin = 15mm,
+    top_margin = 10mm,
+    color = :blue,
+    lab="Proportion of group uninfected")
+
+bar!(plt_prop,
+    pop_sizes./N_uk,
+    bar_width = prop_inf .* 0.9,
+    yscale = :log10,
+    lab = "Proportion of group infected",
+    color = :red
+    )    
+
+
+## New figure 1
+
+layout = @layout [a b;c d; e]
+fig1 = plot(
+    plt_chng,
+    plt_chng_oth,
+    plt_msm,
+    plt_nmsm,
+    plt_prop,
+    size=(1750, 1600),
+    dpi=250,
+    left_margin=10mm,
+    bottom_margin=10mm,
+    right_margin=10mm,
+    top_margin = 5mm,
+    layout=layout,
+)
+
+display(fig1)
+savefig(fig1, "plots/main_figure1_" * string(wks[end]) * ".png")
