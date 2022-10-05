@@ -10,7 +10,8 @@ export mpx_sim_function_interventions,
         generate_forecast_projection,
         generate_scenario_projections,
         cred_intervals, 
-        prev_cred_intervals
+        prev_cred_intervals,
+        sigmoid
 
 
 include("utils.jl")
