@@ -1493,5 +1493,6 @@ plt_unmit = plot(plt_msm_unmit,
                 right_margin=10mm,
                 layout=(1, 2),
             )
-
+savefig(plt_unmit,"plots/unmitigated_mpx.png")
+CSV.write("projections/case_projections_unmitigated_" * string(wks[end]) * ".csv",case_projections_unmitigated)
             
