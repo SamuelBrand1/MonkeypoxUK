@@ -1,4 +1,4 @@
-index,week,curve,gbmsm,na_gbmsm,nongbmsm,seqn_fit1,lower.12,upper.12,seqn_fit2,lower.16,upper.16,seqn_fit3,lower.20,upper.20,seqn_fit4,lower.24,upper.24,seqn_fit5,lower.26,upper.26
+index,week,curve,gbmsm,na_gbmsm,nongbmsm,seqn_fit1,lower.12,upper.12,seqn_fit2,lower.16,upper.16,seqn_fit3,lower.20,upper.20,seqn_fit4,lower.24,upper.24,seqn_fit5,lower_seqn_fit5,upper_seqn_fit5
 5,02/05/2022,2,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 6,09/05/2022,5.333333333,4,0,1.333333333,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 7,16/05/2022,65,64,1,0,0.847053996,0.759758931,0.934349062,0.888664205,0.837957258,0.939371153,0.897526174,0.865840305,0.929212043,0.872405816,0.811642635,0.933168997,0.962112069,0.946921038,0.9773031
