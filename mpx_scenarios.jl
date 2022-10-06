@@ -13,10 +13,29 @@ include("setup_model.jl");
 
 colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
+inferred_prop_na_msm_lwr = past_mpxv_data_inferred[:, "lower_"*colname] |> x -> x[.~ismissing.(x)]
+inferred_prop_na_msm_upr = past_mpxv_data_inferred[:, "upper_"*colname] |> x -> x[.~ismissing.(x)]
+
+
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
     hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm) |> Matrix
+
+lwr_mpxv_wkly =
+    past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
+    past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
+    hcat(inferred_prop_na_msm_lwr, 1.0 .- inferred_prop_na_msm_lwr) |> Matrix
+
+
+upr_mpxv_wkly =
+    past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
+    past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
+    hcat(inferred_prop_na_msm_upr, 1.0 .- inferred_prop_na_msm_upr) |> Matrix
+
+std_mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .* (inferred_prop_na_msm) .* (1.0 .- inferred_prop_na_msm)
+std_mpxv_wkly .+= 
+
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
 # wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.55
@@ -24,6 +43,9 @@ wkly_vaccinations = [[zeros(12); 1000; 2000; fill(5000, 4)] * 1.675
     fill(650, 18)
 ]
 print("cum. vacs = $(sum(wkly_vaccinations))")
+
+##
+
 
 ##Load posterior draws
 # param_draws1 = load("posteriors/posterior_param_draws_2022-08-26_vs1.jld2")["param_draws"]
@@ -336,6 +358,7 @@ scatter!(
     plt_msm,
     wks[3:(end-1)],
     mpxv_wkly[3:(end-1), 1],
+    yerrors = 3*std_mpxv_wkly,
     lab="Data",
     ms=6,
     color=:black,
@@ -463,6 +486,7 @@ scatter!(
     lab="Data",
     ms=6,
     color=:black,
+    yerrors = std_mpxv_wkly
 )
 CSV.write("projections/nongbmsm_case_projections" * string(wks[end]) * ".csv", nongbmsm_case_projections)
 display(plt_nmsm)

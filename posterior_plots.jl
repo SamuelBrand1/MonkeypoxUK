@@ -21,7 +21,7 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-# smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf_vs.jld2")
 # param_draws = [part.params for part in smc.particles]
 param_draws = load("posteriors/posterior_param_draws_2022-09-26_binom_bf.jld2")["param_draws"]
 
@@ -81,10 +81,7 @@ end
 
 ## Calculate the original R0 with next gen matrix method and lastest R(t)
 R0s = map(θ -> construct_next_gen_mat(θ,constants, [ones(10); zeros(0)], [zeros(10);fill(1.0,0)])[1],param_draws )
-
 @show round(mean(R0s),digits = 2),round.(quantile(R0s,[0.1,0.9]),digits = 2)
-
-
 
 ##
 prior_tuple = smc.setup.prior.distribution
