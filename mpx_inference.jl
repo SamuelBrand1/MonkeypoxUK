@@ -12,7 +12,7 @@ include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
 
-colname = "seqn_fit5"
+colname = "seqn_fit0"
 inferred_prop_na_msm = past_mpxv_data_inferred[:,colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm,1),["gbmsm","nongbmsm"]] .+ past_mpxv_data_inferred[1:size(inferred_prop_na_msm,1),"na_gbmsm"] .* hcat(inferred_prop_na_msm,1.0 .- inferred_prop_na_msm)  |> Matrix
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly,1)], DateFormat("dd/mm/yyyy"))
@@ -30,8 +30,7 @@ prior_vect_cng_pnt = [Gamma(1, 1), # α_choose 1
     Beta(1.5, 1.5),#trans_red_other 10
     Beta(1.5,1.5),#trans_red WHO  11 
     Beta(1.5,1.5)]#trans_red_other WHO 12
-    # Beta(1, 4),#trans_red WHO  11 
-    # Beta(1, 4)]#trans_red_other WHO 12
+    
 
 
 ## Use SBC for defining the ABC error target and generate prior predictive plots
