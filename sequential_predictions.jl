@@ -92,7 +92,7 @@ seq_proj_msm = plot(; ylabel="Weekly cases",
         xticks=([Date(2022, 5, 1) + Month(k) for k = 0:7], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:7]),
         left_margin=5mm,right_margin=5mm,
         size=(800, 600), dpi=250,
-        tickfont=18, titlefont=24, guidefont=24, legendfont=12)
+        tickfont=18, titlefont=20, guidefont=24, legendfont=12)
 
 
 for n = 1:5
@@ -117,7 +117,7 @@ seq_proj_nmsm = plot(; ylabel="Weekly cases",
         xticks=([Date(2022, 5, 1) + Month(k) for k = 0:7], [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:7]),
         left_margin=5mm,right_margin=5mm,
         size=(800, 600), dpi=250,
-        tickfont=18, titlefont=24, guidefont=24, legendfont=12)
+        tickfont=18, titlefont=18, guidefont=24, legendfont=12)
 
 ##
 
@@ -153,4 +153,4 @@ fig_seqn_proj = plot(
     top_margin=5mm,
     layout=layout,
 )
-
+savefig(fig_seqn_proj, "plots/seqn_forecasts.png")
