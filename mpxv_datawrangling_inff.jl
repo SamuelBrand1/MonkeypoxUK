@@ -8,7 +8,7 @@ mpxv_wkly = [mpxv_data_inferred.gbmsm mpxv_data_inferred.nongbmsm]
 
 ##
 
-past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-10-06.csv",
+past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
                                 

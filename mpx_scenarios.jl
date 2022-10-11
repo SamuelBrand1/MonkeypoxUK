@@ -16,6 +16,9 @@ inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing
 inferred_prop_na_msm_lwr = past_mpxv_data_inferred[:, "lower_"*colname] |> x -> x[.~ismissing.(x)]
 inferred_prop_na_msm_upr = past_mpxv_data_inferred[:, "upper_"*colname] |> x -> x[.~ismissing.(x)]
 
+# plot(inferred_prop_na_msm[3:end],
+#         ribbon = ( inferred_prop_na_msm[3:end] .- inferred_prop_na_msm_lwr[3:end], inferred_prop_na_msm_upr[3:end] .- inferred_prop_na_msm[3:end]))
+
 
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -33,8 +36,9 @@ upr_mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
     hcat(inferred_prop_na_msm_upr, 1.0 .- inferred_prop_na_msm_upr) |> Matrix
 
-std_mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .* (inferred_prop_na_msm) .* (1.0 .- inferred_prop_na_msm)
-std_mpxv_wkly .+= 
+# std_mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .* (inferred_prop_na_msm) .* (1.0 .- inferred_prop_na_msm)
+# std_mpxv_wkly .+= past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .* (past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .- 1.0) .* 0.02^2
+# std_mpxv_wkly = sqrt.(std_mpxv_wkly)
 
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
@@ -44,14 +48,9 @@ wkly_vaccinations = [[zeros(12); 1000; 2000; fill(5000, 4)] * 1.675
 ]
 print("cum. vacs = $(sum(wkly_vaccinations))")
 
-##
-
-
 ##Load posterior draws
-# param_draws1 = load("posteriors/posterior_param_draws_2022-08-26_vs1.jld2")["param_draws"]
-# param_draws2 = load("posteriors/posterior_param_draws_2022-08-26_vs2.jld2")["param_draws"]
-# param_draws = mapreduce(fn -> load(fn)["param_draws"], vcat, ["posteriors/posterior_param_draws_2022-08-26_vs1.jld2","posteriors/posterior_param_draws_2022-08-26_vs2.jld2"])
-param_draws = load("posteriors/posterior_param_draws_2022-09-26_binom_bf.jld2")["param_draws"]
+
+param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 n_lookaheadweeks = 26
@@ -72,7 +71,7 @@ plt_vacs = plot(
         [Date(2022, 5, 1) + Month(k) for k = 0:12],
         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:12],
     ),
-    yticks = (0:10_000:50_000, string.(0:10_000:50_000)),
+    yticks=(0:10_000:50_000, string.(0:10_000:50_000)),
     size=(800, 600),
     left_margin=5mm,
     guidefont=16,
@@ -83,15 +82,7 @@ plt_vacs = plot(
     right_margin=5mm,
 )
 
-# plot!(
-#     plt_vacs,
-#     [wks[1] + Day(7 * (k - 1)) for k = 1:size(long_wks, 1)],
-#     cumsum(wkly_vaccinations_ceased)[1:size(long_wks, 1)],
-#     lab="Vaccine ceased scenario",
-#     lw=3,
-#     color=:black,
-#     ls=:dot,
-# )
+
 scatter!(plt_vacs, [Date(2022, 7, 1), Date(2022, 8, 30), Date(2022, 9, 22)], [0, 38_079, 40_426], lab="UKHSA reported vaccines", ms=8)
 display(plt_vacs)
 savefig(plt_vacs, "plots/vaccine_rollout.png")
@@ -104,7 +95,7 @@ CSV.write("projections/vaccine_rollout.csv", vaccine_projections)
 chp_t2 = (Date(2022, 7, 23) - Date(2021, 12, 31)).value #Announcement of Public health emergency
 inf_duration_red = 0.0
 
-param_draws_no_behav = param_draws .|> θ -> [θ[1:(end-4)];zeros(4)]
+param_draws_no_behav = param_draws .|> θ -> [θ[1:(end-4)]; zeros(4)]
 
 interventions_ensemble = [
     (
@@ -131,7 +122,7 @@ no_vac_ensemble = [
 
 no_vac_and_no_red_ensemble = [
     (
-        trans_red2= 0 ,#Based on posterior for first change point with extra dispersion
+        trans_red2=0,#Based on posterior for first change point with extra dispersion
         vac_effectiveness=rand(Uniform(0.7, 0.85)),
         trans_red_other2=θ[10] * θ[12],
         wkly_vaccinations=zeros(size(wkly_vaccinations_ceased)),
@@ -183,20 +174,11 @@ preds_and_incidence_interventions_cvac_12wkrev = map(
 preds_and_incidence_novac_no_chg = map(
     (θ, intervention) ->
         mpx_sim_function_interventions(θ, constants, long_mpxv_wkly, intervention)[2:4],
-        param_draws_no_behav,
-        no_vac_and_no_red_ensemble,
+    param_draws_no_behav,
+    no_vac_and_no_red_ensemble,
 )
 
-## Cumulative incidence on week 12 (Mid July) for highest frequency groups for paper
-
-cum_inc_wk_12 = [
-    sum(pred[2][1:15, 3:10]) ./ sum(N_msm * ps[3:10]) for
-    pred in preds_and_incidence_interventions
-]
-mean(cum_inc_wk_12)
-@show mean(cum_inc_wk_12), quantile(cum_inc_wk_12, [0.1, 0.9])
-
-##Gather data
+##Gather projections
 d1, d2 = size(mpxv_wkly)
 
 preds = [x[1] for x in preds_and_incidence_interventions]
@@ -208,7 +190,7 @@ preds_cvac4wk = [x[1] for x in preds_and_incidence_interventions_cvac_4wkrev]
 preds_cvac12wk = [x[1] for x in preds_and_incidence_interventions_cvac_12wkrev]
 
 pred_unmitigated = [x[1] for x in preds_and_incidence_novac_no_chg]
-cum_cases_unmitigated = [cumsum(x[1],dims = 1) for x in preds_and_incidence_novac_no_chg]
+cum_cases_unmitigated = [cumsum(x[1], dims=1) for x in preds_and_incidence_novac_no_chg]
 
 cum_cases_forwards =
     [cumsum(x[1][(d1+1):end, :], dims=1) for x in preds_and_incidence_interventions]
@@ -253,8 +235,8 @@ reported_gbmsm_cases[3:size(mpxv_wkly, 1)] .= mpxv_wkly[3:end, 1]
 gbmsm_case_projections[:, "Inferred GBMSM cases"] = reported_gbmsm_cases
 
 gbmsm_case_projections[:, "Projected GBMSM cases (post. mean; no reversion)"] = cred_int.mean_pred[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 10%; no reversion)"] = cred_int.mean_pred[:, 1] .- cred_int.lb_pred_10[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 90%; no reversion)"] = cred_int.mean_pred[:, 1] .+ cred_int.ub_pred_10[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 25%; no reversion)"] = cred_int.mean_pred[:, 1] .- cred_int.lb_pred_25[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 75%; no reversion)"] = cred_int.mean_pred[:, 1] .+ cred_int.ub_pred_25[:, 1]
 
 plt_msm = plot(;
     ylabel="Weekly cases",
@@ -279,7 +261,7 @@ plot!(
     plt_msm,
     long_wks,
     cred_int_12wk.mean_pred[:, 1],
-    ribbon=(cred_int_12wk.lb_pred_10[:, 1], cred_int_12wk.ub_pred_10[:, 1]),
+    ribbon=(cred_int_12wk.lb_pred_25[:, 1], cred_int_12wk.ub_pred_25[:, 1]),
     lw=3,
     color=:black,
     fillalpha=0.2,
@@ -288,15 +270,15 @@ plot!(
 
 gbmsm_case_projections[:, "Date"] = long_wks
 gbmsm_case_projections[:, "Projected GBMSM cases (post. mean; 12 wk reversion)"] = cred_int_12wk.mean_pred[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 10%; 12 wk reversion)"] = cred_int_12wk.mean_pred[:, 1] .- cred_int_12wk.lb_pred_10[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 90%; 12 wk reversion)"] = cred_int_12wk.mean_pred[:, 1] .+ cred_int_12wk.ub_pred_10[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 25%; 12 wk reversion)"] = cred_int_12wk.mean_pred[:, 1] .- cred_int_12wk.lb_pred_25[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 75%; 12 wk reversion)"] = cred_int_12wk.mean_pred[:, 1] .+ cred_int_12wk.ub_pred_25[:, 1]
 
 
 plot!(
     plt_msm,
     long_wks[1:end],
     cred_int_cvac12wk.mean_pred[1:end, 1],
-    # ribbon=(cred_int_cvac.lb_pred_10[d_proj:end, 1], cred_int_cvac.ub_pred_10[d_proj:end, 1]),
+    # ribbon=(cred_int_cvac.lb_pred_25[d_proj:end, 1], cred_int_cvac.ub_pred_25[d_proj:end, 1]),
     lw=3,
     color=:black,
     ls=:dash,
@@ -305,15 +287,15 @@ plot!(
 )
 
 gbmsm_case_projections[:, "Projected GBMSM cases (post. mean; 12 wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 10%; 12 wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 1] .- cred_int_cvac12wk.lb_pred_10[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 90%; 12 wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 1] .+ cred_int_cvac12wk.ub_pred_10[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 25%; 12 wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 1] .- cred_int_cvac12wk.lb_pred_25[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 75%; 12 wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 1] .+ cred_int_cvac12wk.ub_pred_25[:, 1]
 
 
 plot!(
     plt_msm,
     long_wks[d_proj:end],
     cred_int_4wk.mean_pred[d_proj:end, 1],
-    ribbon=(cred_int_4wk.lb_pred_10[d_proj:end, 1], cred_int_4wk.ub_pred_10[d_proj:end, 1]),
+    ribbon=(cred_int_4wk.lb_pred_25[d_proj:end, 1], cred_int_4wk.ub_pred_25[d_proj:end, 1]),
     lw=3,
     color=2,
     fillalpha=0.2,
@@ -321,8 +303,8 @@ plot!(
 )
 
 gbmsm_case_projections[:, "Projected GBMSM cases (post. mean; 4 wk reversion)"] = cred_int_4wk.mean_pred[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 10%; 4 wk reversion)"] = cred_int_4wk.mean_pred[:, 1] .- cred_int_4wk.lb_pred_10[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 90%; 4 wk reversion)"] = cred_int_4wk.mean_pred[:, 1] .+ cred_int_4wk.ub_pred_10[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 25%; 4 wk reversion)"] = cred_int_4wk.mean_pred[:, 1] .- cred_int_4wk.lb_pred_25[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 75%; 4 wk reversion)"] = cred_int_4wk.mean_pred[:, 1] .+ cred_int_4wk.ub_pred_25[:, 1]
 
 
 
@@ -330,7 +312,7 @@ plot!(
     plt_msm,
     long_wks[19:end],
     cred_int_cvac4wk.mean_pred[19:end, 1],
-    # ribbon=(cred_int_4wk.lb_pred_10[19:end, 1], cred_int_4wk.ub_pred_10[19:end, 1]),
+    # ribbon=(cred_int_4wk.lb_pred_25[19:end, 1], cred_int_4wk.ub_pred_25[19:end, 1]),
     lw=3,
     ls=:dash,
     color=2,
@@ -339,8 +321,8 @@ plot!(
 )
 
 gbmsm_case_projections[:, "Projected GBMSM cases (post. mean; 4 wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 10%; 4 wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 1] .- cred_int_cvac4wk.lb_pred_10[:, 1]
-gbmsm_case_projections[:, "Projected GBMSM cases (post. 90%; 4 wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 1] .+ cred_int_cvac4wk.ub_pred_10[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 25%; 4 wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 1] .- cred_int_cvac4wk.lb_pred_25[:, 1]
+gbmsm_case_projections[:, "Projected GBMSM cases (post. 75%; 4 wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 1] .+ cred_int_cvac4wk.ub_pred_25[:, 1]
 
 
 
@@ -358,7 +340,7 @@ scatter!(
     plt_msm,
     wks[3:(end-1)],
     mpxv_wkly[3:(end-1), 1],
-    yerrors = 3*std_mpxv_wkly,
+    yerrors = (mpxv_wkly[3:(end-1), 1] .- lwr_mpxv_wkly[3:(end-1), 1] , upr_mpxv_wkly[3:(end-1), 1] .- mpxv_wkly[3:(end-1), 1] ),
     lab="Data",
     ms=6,
     color=:black,
@@ -377,8 +359,8 @@ reported_nongbmsm_cases[3:size(mpxv_wkly, 1)] .= mpxv_wkly[3:end, 2]
 nongbmsm_case_projections[:, "Inferred non-GBMSM cases"] = reported_nongbmsm_cases
 
 nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. mean; no reversion)"] = cred_int.mean_pred[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 10%; no reversion)"] = cred_int.mean_pred[:, 2] .- cred_int.lb_pred_10[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 90%; no reversion)"] = cred_int.mean_pred[:, 2] .+ cred_int.ub_pred_10[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 25%; no reversion)"] = cred_int.mean_pred[:, 2] .- cred_int.lb_pred_25[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 75%; no reversion)"] = cred_int.mean_pred[:, 2] .+ cred_int.ub_pred_25[:, 2]
 
 
 
@@ -405,7 +387,7 @@ plot!(
     plt_nmsm,
     long_wks,
     cred_int_12wk.mean_pred[:, 2],
-    ribbon=(cred_int_12wk.lb_pred_10[:, 2], cred_int_12wk.ub_pred_10[:, 2]),
+    ribbon=(cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
     lw=3,
     color=:black,
     fillalpha=0.2,
@@ -413,8 +395,8 @@ plot!(
 )
 
 nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. mean; 12wk reversion)"] = cred_int_12wk.mean_pred[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 10%; 12wk reversion)"] = cred_int_12wk.mean_pred[:, 2] .- cred_int_12wk.lb_pred_10[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 90%; 12wk reversion)"] = cred_int_12wk.mean_pred[:, 2] .+ cred_int_12wk.ub_pred_10[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 25%; 12wk reversion)"] = cred_int_12wk.mean_pred[:, 2] .- cred_int_12wk.lb_pred_25[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 75%; 12wk reversion)"] = cred_int_12wk.mean_pred[:, 2] .+ cred_int_12wk.ub_pred_25[:, 2]
 
 
 
@@ -422,7 +404,7 @@ plot!(
     plt_nmsm,
     long_wks[d_proj:end],
     cred_int_cvac12wk.mean_pred[d_proj:end, 2],
-    # ribbon=(cred_int_cvac.lb_pred_10[d_proj:end, 1], cred_int_cvac.ub_pred_10[d_proj:end, 1]),
+    # ribbon=(cred_int_cvac.lb_pred_25[d_proj:end, 1], cred_int_cvac.ub_pred_25[d_proj:end, 1]),
     lw=3,
     color=:black,
     ls=:dash,
@@ -432,15 +414,15 @@ plot!(
 
 
 nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. mean; 12wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 10%; 12wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 2] .- cred_int_cvac12wk.lb_pred_10[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 90%; 12wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 2] .+ cred_int_cvac12wk.ub_pred_10[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 25%; 12wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 2] .- cred_int_cvac12wk.lb_pred_25[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 75%; 12wk reversion + no vacs)"] = cred_int_cvac12wk.mean_pred[:, 2] .+ cred_int_cvac12wk.ub_pred_25[:, 2]
 
 
 plot!(
     plt_nmsm,
     long_wks[19:end],
     cred_int_4wk.mean_pred[19:end, 2],
-    ribbon=(cred_int_4wk.lb_pred_10[19:end, 2], cred_int_4wk.ub_pred_10[19:end, 2]),
+    ribbon=(cred_int_4wk.lb_pred_25[19:end, 2], cred_int_4wk.ub_pred_25[19:end, 2]),
     lw=3,
     color=2,
     fillalpha=0.2,
@@ -448,8 +430,8 @@ plot!(
 )
 
 nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. mean; 4wk reversion)"] = cred_int_4wk.mean_pred[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 10%; 4wk reversion)"] = cred_int_4wk.mean_pred[:, 2] .- cred_int_4wk.lb_pred_10[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 90%; 4wk reversion)"] = cred_int_4wk.mean_pred[:, 2] .+ cred_int_4wk.ub_pred_10[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 25%; 4wk reversion)"] = cred_int_4wk.mean_pred[:, 2] .- cred_int_4wk.lb_pred_25[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 75%; 4wk reversion)"] = cred_int_4wk.mean_pred[:, 2] .+ cred_int_4wk.ub_pred_25[:, 2]
 
 
 
@@ -457,7 +439,7 @@ plot!(
     plt_nmsm,
     long_wks[19:end],
     cred_int_cvac4wk.mean_pred[19:end, 2],
-    # ribbon=(cred_int_4wk.lb_pred_10[19:end, 1], cred_int_4wk.ub_pred_10[19:end, 1]),
+    # ribbon=(cred_int_4wk.lb_pred_25[19:end, 1], cred_int_4wk.ub_pred_25[19:end, 1]),
     lw=3,
     ls=:dash,
     color=2,
@@ -466,8 +448,8 @@ plot!(
 )
 
 nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. mean; 4wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 10%; 4wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 2] .- cred_int_cvac4wk.lb_pred_10[:, 2]
-nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 90%; 4wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 2] .+ cred_int_cvac4wk.ub_pred_10[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 25%; 4wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 2] .- cred_int_cvac4wk.lb_pred_25[:, 2]
+nongbmsm_case_projections[:, "Projected non-GBMSM cases (post. 75%; 4wk reversion + no vacs)"] = cred_int_cvac4wk.mean_pred[:, 2] .+ cred_int_cvac4wk.ub_pred_25[:, 2]
 
 
 scatter!(
@@ -486,7 +468,7 @@ scatter!(
     lab="Data",
     ms=6,
     color=:black,
-    yerrors = std_mpxv_wkly
+    yerrors = (mpxv_wkly[3:(end-1), 2] .- lwr_mpxv_wkly[3:(end-1), 2] , upr_mpxv_wkly[3:(end-1), 2] .- mpxv_wkly[3:(end-1), 2] ),
 )
 CSV.write("projections/nongbmsm_case_projections" * string(wks[end]) * ".csv", nongbmsm_case_projections)
 display(plt_nmsm)
@@ -509,8 +491,8 @@ gbmsm_cum_case_projections = DataFrame()
 gbmsm_cum_case_projections[:, "Date"] = long_wks[((d1+1)):end]
 
 gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; no reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence.mean_pred[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; no reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence.mean_pred[:, 1] .- cred_int_cum_incidence.lb_pred_10[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; no reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence.mean_pred[:, 1] .+ cred_int_cum_incidence.ub_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 25%; no reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence.mean_pred[:, 1] .- cred_int_cum_incidence.lb_pred_25[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 75%; no reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence.mean_pred[:, 1] .+ cred_int_cum_incidence.ub_pred_25[:, 1]
 
 
 plt_cm_msm = plot(;
@@ -519,15 +501,15 @@ plt_cm_msm = plot(;
     legend=:topleft,
     # yticks=(0:2500:12500, 0:2500:100),
     xticks=(
-        [Date(2022, 5, 1) + Month(k) for k = 0:10],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:10],
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
     left_margin=5mm,
     size=(800, 600),
     dpi=250,
-    tickfont=13,
-    titlefont=18,
-    guidefont=18,
+    tickfont=15,
+    titlefont=16,
+    guidefont=24,
     legendfont=11
 )
 
@@ -536,18 +518,18 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1],
     ribbon=(
-        cred_int_cum_incidence12wks.lb_pred_10[:, 1],
-        cred_int_cum_incidence12wks.ub_pred_10[:, 1],
+        cred_int_cum_incidence12wks.lb_pred_25[:, 1],
+        cred_int_cum_incidence12wks.ub_pred_25[:, 1],
     ),
     lw=3,
     color=:black,
-    fillalpha=0.2,
+    fillalpha=0.4,
     lab="12 week reversion",
 )
 
 gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 12wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 12wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1] .- cred_int_cum_incidence12wks.lb_pred_10[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 12wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1] .+ cred_int_cum_incidence12wks.ub_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 25%; 12wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1] .- cred_int_cum_incidence12wks.lb_pred_25[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 75%; 12wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence12wks.mean_pred[:, 1] .+ cred_int_cum_incidence12wks.ub_pred_25[:, 1]
 
 
 plot!(
@@ -555,19 +537,20 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1],
     ribbon=(
-        cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 1],
-        cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 1],
+        cred_int_cum_incidence_cvac12wks.lb_pred_25[:, 1],
+        cred_int_cum_incidence_cvac12wks.ub_pred_25[:, 1],
     ),
     lw=3,
     ls=:dash,
     color=:black,
     fillalpha=0.2,
+    fillstyle = :x,
     lab="12 week reversion (no vaccines)",
 )
 
 gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1] .- cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1] .+ cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 25%; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1] .- cred_int_cum_incidence_cvac12wks.lb_pred_25[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 75%; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1] .+ cred_int_cum_incidence_cvac12wks.ub_pred_25[:, 1]
 
 
 
@@ -576,18 +559,18 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1],
     ribbon=(
-        cred_int_cum_incidence4wks.lb_pred_10[:, 1],
-        cred_int_cum_incidence4wks.ub_pred_10[:, 1],
+        cred_int_cum_incidence4wks.lb_pred_25[:, 1],
+        cred_int_cum_incidence4wks.ub_pred_25[:, 1],
     ),
     lw=3,
     color=2,
-    fillalpha=0.2,
+    fillalpha=0.4,
     lab="4 week reversion",
 )
 
 gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1] .- cred_int_cum_incidence4wks.lb_pred_10[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1] .+ cred_int_cum_incidence4wks.ub_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 25%; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1] .- cred_int_cum_incidence4wks.lb_pred_25[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 75%; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1] .+ cred_int_cum_incidence4wks.ub_pred_25[:, 1]
 
 
 plot!(
@@ -595,19 +578,36 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1],
     ribbon=(
-        cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 1],
-        cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 1],
+        cred_int_cum_incidence_cvac4wks.lb_pred_25[:, 1],
+        cred_int_cum_incidence_cvac4wks.ub_pred_25[:, 1],
     ),
     lw=3,
     ls=:dash,
+    fillstyle = :x,
     color=2,
-    fillalpha=0.2,
+    fillalpha=0.3,
     lab="4 week reversion (no vaccines)",
 )
 
 gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1] .- cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 1]
-gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1] .+ cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 25%; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1] .- cred_int_cum_incidence_cvac4wks.lb_pred_25[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 75%; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1] .+ cred_int_cum_incidence_cvac4wks.ub_pred_25[:, 1]
+
+plot!(
+    plt_cm_msm,
+    long_wks,
+    cred_int_cum_cases_unmitigated.mean_pred[:, 1],
+    ribbon=(
+        cred_int_cum_cases_unmitigated.lb_pred_25[:, 1],
+        cred_int_cum_cases_unmitigated.ub_pred_25[:, 1],
+    ),
+    lw=3,
+    ls=:dash,
+    color= :green,
+    fillalpha=0.2,
+    fillstyle = :x,
+    lab="Unmitigated",
+)
 
 
 scatter!(
@@ -621,6 +621,8 @@ scatter!(
 
 CSV.write("projections/gbmsm_cumulative_case_projections" * string(wks[end]) * ".csv", gbmsm_cum_case_projections)
 display(plt_cm_msm)
+savefig(plt_cm_msm,"plt_cm_msm.svg")
+
 ##
 total_cases = sum(mpxv_wkly, dims=1)
 
@@ -628,8 +630,8 @@ nongbmsm_cum_case_projections = DataFrame()
 nongbmsm_cum_case_projections[:, "Date"] = long_wks[((d1+1)):end]
 
 nongbmsm_cum_case_projections[:, "Projected Cum. non-GBMSM cases (post. mean; no reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence.mean_pred[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 10%; no reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence.mean_pred[:, 2] .- cred_int_cum_incidence.lb_pred_10[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 90%; no reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence.mean_pred[:, 2] .+ cred_int_cum_incidence.ub_pred_10[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 25%; no reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence.mean_pred[:, 2] .- cred_int_cum_incidence.lb_pred_25[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 75%; no reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence.mean_pred[:, 2] .+ cred_int_cum_incidence.ub_pred_25[:, 2]
 
 
 
@@ -639,15 +641,15 @@ plt_cm_nmsm = plot(;
     legend=:topleft,
     # yticks=(0:2500:12500, 0:2500:12500),
     xticks=(
-        [Date(2022, 5, 1) + Month(k) for k = 0:10],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:10],
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
     left_margin=5mm,
     size=(800, 600),
     dpi=250,
-    tickfont=13,
-    titlefont=17,
-    guidefont=18,
+    tickfont=15,
+    titlefont=16,
+    guidefont=24,
     legendfont=11
 )
 
@@ -656,18 +658,18 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2],
     ribbon=(
-        cred_int_cum_incidence12wks.lb_pred_10[:, 2],
-        cred_int_cum_incidence12wks.ub_pred_10[:, 2],
+        cred_int_cum_incidence12wks.lb_pred_25[:, 2],
+        cred_int_cum_incidence12wks.ub_pred_25[:, 2],
     ),
     lw=3,
     color=:black,
-    fillalpha=0.2,
+    fillalpha=0.4,
     lab="12 week reversion",
 )
 
 nongbmsm_cum_case_projections[:, "Projected Cum. non-GBMSM cases (post. mean; 12wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 10%; 12wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2] .- cred_int_cum_incidence12wks.lb_pred_10[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 90%; 12wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2] .+ cred_int_cum_incidence12wks.ub_pred_10[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 25%; 12wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2] .- cred_int_cum_incidence12wks.lb_pred_25[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 75%; 12wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence12wks.mean_pred[:, 2] .+ cred_int_cum_incidence12wks.ub_pred_25[:, 2]
 
 
 plot!(
@@ -675,19 +677,20 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2],
     ribbon=(
-        cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 2],
-        cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 2],
+        cred_int_cum_incidence_cvac12wks.lb_pred_25[:, 2],
+        cred_int_cum_incidence_cvac12wks.ub_pred_25[:, 2],
     ),
     lw=3,
     ls=:dash,
     color=:black,
     fillalpha=0.2,
+    fillstyle = :x,
     lab="12 week reversion (no vaccines)",
 )
 
 nongbmsm_cum_case_projections[:, "Projected Cum. non-GBMSM cases (post. mean; 12wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 10%; 12wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2] .- cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 90%; 12wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2] .+ cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 25%; 12wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2] .- cred_int_cum_incidence_cvac12wks.lb_pred_25[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 75%; 12wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 2] .+ cred_int_cum_incidence_cvac12wks.ub_pred_25[:, 2]
 
 
 
@@ -696,18 +699,18 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2],
     ribbon=(
-        cred_int_cum_incidence4wks.lb_pred_10[:, 2],
-        cred_int_cum_incidence4wks.ub_pred_10[:, 2],
+        cred_int_cum_incidence4wks.lb_pred_25[:, 2],
+        cred_int_cum_incidence4wks.ub_pred_25[:, 2],
     ),
     lw=3,
     color=2,
-    fillalpha=0.2,
+    fillalpha=0.4,
     lab="4 week reversion",
 )
 
 nongbmsm_cum_case_projections[:, "Projected Cum. non-GBMSM cases (post. mean; 4wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 10%; 4wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2] .- cred_int_cum_incidence4wks.lb_pred_10[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 90%; 4wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2] .+ cred_int_cum_incidence4wks.ub_pred_10[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 25%; 4wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2] .- cred_int_cum_incidence4wks.lb_pred_25[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 75%; 4wk reversion)"] = total_cases[:, 2] .+ cred_int_cum_incidence4wks.mean_pred[:, 2] .+ cred_int_cum_incidence4wks.ub_pred_25[:, 2]
 
 
 plot!(
@@ -715,21 +718,37 @@ plot!(
     long_wks[((d1+1)):end],
     total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2],
     ribbon=(
-        cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 2],
-        cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 2],
+        cred_int_cum_incidence_cvac4wks.lb_pred_25[:, 2],
+        cred_int_cum_incidence_cvac4wks.ub_pred_25[:, 2],
     ),
     lw=3,
     ls=:dash,
     color=2,
     fillalpha=0.2,
+    fillstyle = :x,
     lab="4 week reversion (no vaccines)",
 )
 
 nongbmsm_cum_case_projections[:, "Projected Cum. non-GBMSM cases (post. mean; 4wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 10%; 4wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2] .- cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 2]
-nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 90%; 4wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2] .+ cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 25%; 4wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2] .- cred_int_cum_incidence_cvac4wks.lb_pred_25[:, 2]
+nongbmsm_cum_case_projections[:, "Projected non-GBMSM cases (post. 75%; 4wk reversion + no vacs)"] = total_cases[:, 2] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 2] .+ cred_int_cum_incidence_cvac4wks.ub_pred_25[:, 2]
 
 
+plot!(
+    plt_cm_nmsm,
+    long_wks,
+    cred_int_cum_cases_unmitigated.mean_pred[:, 2],
+    ribbon=(
+        cred_int_cum_cases_unmitigated.lb_pred_25[:, 2],
+        cred_int_cum_cases_unmitigated.ub_pred_25[:, 2],
+    ),
+    lw=3,
+    ls=:dash,
+    color= :green,
+    fillalpha=0.2,
+    fillstyle = :x,
+    lab="Unmitigated",
+)
 
 
 scatter!(
@@ -744,6 +763,7 @@ scatter!(
 CSV.write("projections/nongbmsm_cumulative_case_projections" * string(wks[end]) * ".csv", nongbmsm_cum_case_projections)
 
 display(plt_cm_nmsm)
+savefig(plt_cm_nmsm,"plt_cm_nmsm.svg")
 ##Combined plot for cases
 lo = @layout [a b; c d]
 plt = plot(
@@ -762,6 +782,7 @@ display(plt)
 
 
 savefig(plt, "plots/case_projections_" * string(wks[end]) * ".png")
+savefig(plt, "plots/case_projections_" * string(wks[end]) * ".svg")
 
 
 ## Change in transmission over time
@@ -807,13 +828,13 @@ function generate_trans_risk_over_time(
     reversion_time=(Date(2022, 9, 1) - Date(2021, 12, 31)).value
 )
     # log_r = -(log(1 - trans_red) + log(1 - trans_red2)) / days_reversion
-    T₅₀ = reversion_time + (days_reversion/ 2) # 50% return to normal point
+    T₅₀ = reversion_time + (days_reversion / 2) # 50% return to normal point
     κ = (days_reversion / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
-    p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
+    p_min = p_trans * (1 - trans_red) * (1 - trans_red2)
 
     log_p = [log(p_trans) + log(1 - trans_red) * (t >= chp) + log(1 - trans_red2) * (t >= chp2) for t in ts]
-    
-    return exp.(log_p) .+ [(p_trans - p_min)*sigmoid((t - T₅₀)/κ) for t in ts] 
+
+    return exp.(log_p) .+ [(p_trans - p_min) * sigmoid((t - T₅₀) / κ) for t in ts]
 end
 
 """
@@ -841,16 +862,16 @@ function generate_R_gbmsm_over_time(
     chp2,
     ts,
     days_reversion;
-    av_cnt_rate = mean(mean_daily_cnts),
+    av_cnt_rate=mean(mean_daily_cnts),
     reversion_time=(Date(2022, 9, 1) - Date(2021, 12, 31)).value
 )
     # log_r = -(log(1 - trans_red) + log(1 - trans_red2)) / days_reversion
-    T₅₀ = reversion_time + (days_reversion/ 2) # 50% return to normal point
+    T₅₀ = reversion_time + (days_reversion / 2) # 50% return to normal point
     κ = (days_reversion / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
-    p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
+    p_min = p_trans * (1 - trans_red) * (1 - trans_red2)
 
     log_p = [log(p_trans) + log(1 - trans_red) * (t >= chp) + log(1 - trans_red2) * (t >= chp2) for t in ts]
-    pₜ = exp.(log_p) .+ [(p_trans - p_min)*sigmoid((t - T₅₀)/κ) for t in ts] 
+    pₜ = exp.(log_p) .+ [(p_trans - p_min) * sigmoid((t - T₅₀) / κ) for t in ts]
     return mean_inf_period .* av_cnt_rate .* pₜ
 end
 
@@ -874,7 +895,7 @@ p_sx_trans_risks =
         chp1,
     ) .|> x -> reshape(x, length(x), 1)
 
-  
+
 p_sx_trans_risks_4wk =
     map(
         (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
@@ -909,7 +930,7 @@ R_gbmsm_4wk =
         red_sx_trans,
         red_sx_trans2,
         chp1,
-    ) .|> x -> reshape(x, length(x), 1)    
+    ) .|> x -> reshape(x, length(x), 1)
 
 p_sx_trans_risks_12wk =
     map(
@@ -945,7 +966,7 @@ R_gbmsm_12wk =
         red_sx_trans,
         red_sx_trans2,
         chp1,
-    ) .|> x -> reshape(x, length(x), 1) 
+    ) .|> x -> reshape(x, length(x), 1)
 
 sx_trans_risk_cred_int = prev_cred_intervals(p_sx_trans_risks)
 sx_trans_risk_cred_int_4wk = prev_cred_intervals(p_sx_trans_risks_4wk)
@@ -971,7 +992,7 @@ R_gbmsm_df[:, "Date"] = dates[dates.>=Date(2022, 5, 1)]
 plt_chng = plot(
     dates,
     sx_trans_risk_cred_int_12wk.mean_pred,
-    ribbon=(sx_trans_risk_cred_int_12wk.lb_pred_10, sx_trans_risk_cred_int_12wk.ub_pred_10),
+    ribbon=(sx_trans_risk_cred_int_12wk.lb_pred_25, sx_trans_risk_cred_int_12wk.ub_pred_25),
     lw=3,
     fillalpha=0.2,
     lab="Transmission probability (12 week reversion)",
@@ -983,7 +1004,7 @@ plt_chng = plot(
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
-    color = :black,
+    color=:black,
     left_margin=5mm,
     size=(800, 600),
     dpi=250,
@@ -996,7 +1017,7 @@ plt_chng = plot(
 plt_R_gbmsm = plot(
     dates,
     R_gbmsms_cred_int_12wk.mean_pred,
-    ribbon=(R_gbmsms_cred_int_12wk.lb_pred_10, R_gbmsms_cred_int_12wk.ub_pred_10),
+    ribbon=(R_gbmsms_cred_int_12wk.lb_pred_25, R_gbmsms_cred_int_12wk.ub_pred_25),
     lw=3,
     fillalpha=0.2,
     lab="12 week reversion",
@@ -1008,8 +1029,8 @@ plt_R_gbmsm = plot(
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
-    yticks = 1:10,
-    color = :black,
+    yticks=1:10,
+    color=:black,
     left_margin=5mm,
     size=(800, 600),
     dpi=250,
@@ -1021,16 +1042,16 @@ plt_R_gbmsm = plot(
 
 
 sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. mean, no reversion)"] = sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 10%, no reversion)"] = sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .- sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 90%, no reversion)"] = sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .+ sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
+sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 25%, no reversion)"] = sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .- sx_trans_risk_cred_int.lb_pred_25[dates.>=Date(2022, 5, 1)]
+sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 75%, no reversion)"] = sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .+ sx_trans_risk_cred_int.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 plot!(
     plt_chng,
     dates[f:end],
     sx_trans_risk_cred_int_4wk.mean_pred[f:end],
     ribbon=(
-        sx_trans_risk_cred_int_4wk.lb_pred_10[f:end],
-        sx_trans_risk_cred_int_4wk.ub_pred_10[f:end],
+        sx_trans_risk_cred_int_4wk.lb_pred_25[f:end],
+        sx_trans_risk_cred_int_4wk.ub_pred_25[f:end],
     ),
     lw=3,
     fillalpha=0.3,
@@ -1042,8 +1063,8 @@ plot!(
     dates[f:end],
     R_gbmsms_cred_int_4wk.mean_pred[f:end],
     ribbon=(
-        R_gbmsms_cred_int_4wk.lb_pred_10[f:end],
-        R_gbmsms_cred_int_4wk.ub_pred_10[f:end],
+        R_gbmsms_cred_int_4wk.lb_pred_25[f:end],
+        R_gbmsms_cred_int_4wk.ub_pred_25[f:end],
     ),
     lw=3,
     fillalpha=0.3,
@@ -1052,20 +1073,20 @@ plot!(
 
 
 sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. mean, 4wk reversion)"] = sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 10%, 4wk reversion)"] = sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .- sx_trans_risk_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 90%, 4wk reversion)"] = sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ sx_trans_risk_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
+sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 25%, 4wk reversion)"] = sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .- sx_trans_risk_cred_int_4wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
+sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 75%, 4wk reversion)"] = sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ sx_trans_risk_cred_int_4wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 R_gbmsm_df[:, "R0 GBMSM (post. mean, 4wk reversion)"] = R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 10%, 4wk reversion)"] = R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .- R_gbmsms_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 90%, 4wk reversion)"] = R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ R_gbmsms_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
+R_gbmsm_df[:, "R0 GBMSM (post. 25%, 4wk reversion)"] = R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .- R_gbmsms_cred_int_4wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
+R_gbmsm_df[:, "R0 GBMSM (post. 75%, 4wk reversion)"] = R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ R_gbmsms_cred_int_4wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. mean, 12wk reversion)"] = sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 10%, 12wk reversion)"] = sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .- sx_trans_risk_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 90%, 12wk reversion)"] = sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ sx_trans_risk_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
+sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 25%, 12wk reversion)"] = sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .- sx_trans_risk_cred_int_12wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
+sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 75%, 12wk reversion)"] = sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ sx_trans_risk_cred_int_12wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 R_gbmsm_df[:, "R0 GBMSM (post. mean, 12wk reversion)"] = R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 10%, 12wk reversion)"] = R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .- R_gbmsms_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 90%, 12wk reversion)"] = R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ R_gbmsms_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
+R_gbmsm_df[:, "R0 GBMSM (post. 25%, 12wk reversion)"] = R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .- R_gbmsms_cred_int_12wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
+R_gbmsm_df[:, "R0 GBMSM (post. 75%, 12wk reversion)"] = R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .+ R_gbmsms_cred_int_12wk.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 vline!(
     plt_chng,
@@ -1074,8 +1095,8 @@ vline!(
     color=:black,
     ls=:dot,
     lab="",
-    annotation = (Date(2022, 7, 23) + Day(7), 0.5, "WHO declaration"),
-    annotationrotation = 270
+    annotation=(Date(2022, 7, 23) + Day(7), 0.5, "WHO declaration"),
+    annotationrotation=270
 )
 
 vline!(
@@ -1085,8 +1106,8 @@ vline!(
     color=:black,
     ls=:dot,
     lab="",
-    annotation = (Date(2022, 7, 23) + Day(7), 7.5, "WHO declaration"),
-    annotationrotation = 270
+    annotation=(Date(2022, 7, 23) + Day(7), 7.5, "WHO declaration"),
+    annotationrotation=270
 )
 # annotate!(plt_chng,Date(2022, 7, 23),0.5, "WHO" )
 
@@ -1169,19 +1190,19 @@ R_oth_risk[:, "Date"] = dates[dates.>=Date(2022, 5, 1)]
 plt_chng_oth = plot(
     dates,
     oth_sx_trans_risk_cred_int12wks.mean_pred,
-    ribbon=(oth_sx_trans_risk_cred_int12wks.lb_pred_10, oth_sx_trans_risk_cred_int12wks.ub_pred_10),
+    ribbon=(oth_sx_trans_risk_cred_int12wks.lb_pred_25, oth_sx_trans_risk_cred_int12wks.ub_pred_25),
     lw=3,
     fillalpha=0.2,
     lab="R0, other contacts (12 week reversion)",
     title="Reproductive number (other contacts)",
     ylabel="R₀(t) (other contacts)",
     xlims=(long_wks[1] - Day(7), long_wks[end] + Day(7)),
-    ylims = (0,0.3),
+    ylims=(0, 0.3),
     xticks=(
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
-    color = :black,
+    color=:black,
     left_margin=5mm,
     right_margin=5mm,
     size=(800, 600),
@@ -1193,8 +1214,8 @@ plt_chng_oth = plot(
 )
 
 R_oth_risk[:, "R other (post. mean, no reversion)"] = oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 10%, no reversion)"] = oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .- oth_sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 90%, no reversion)"] = oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .+ oth_sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
+R_oth_risk[:, "R other (post. 25%, no reversion)"] = oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .- oth_sx_trans_risk_cred_int.lb_pred_25[dates.>=Date(2022, 5, 1)]
+R_oth_risk[:, "R other (post. 75%, no reversion)"] = oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .+ oth_sx_trans_risk_cred_int.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 
 plot!(
@@ -1202,8 +1223,8 @@ plot!(
     dates[f:end],
     oth_sx_trans_risk_cred_int4wks.mean_pred[f:end],
     ribbon=(
-        oth_sx_trans_risk_cred_int4wks.lb_pred_10[f:end],
-        oth_sx_trans_risk_cred_int4wks.ub_pred_10[f:end],
+        oth_sx_trans_risk_cred_int4wks.lb_pred_25[f:end],
+        oth_sx_trans_risk_cred_int4wks.ub_pred_25[f:end],
     ),
     lw=3,
     fillalpha=0.3,
@@ -1211,8 +1232,8 @@ plot!(
 )
 
 R_oth_risk[:, "R other (post. mean, 4wk reversion)"] = oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 10%, 4wk reversion)"] = oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)] .- oth_sx_trans_risk_cred_int4wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 90%, 4wk reversion)"] = oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)] .+ oth_sx_trans_risk_cred_int4wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
+R_oth_risk[:, "R other (post. 25%, 4wk reversion)"] = oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)] .- oth_sx_trans_risk_cred_int4wks.lb_pred_25[dates.>=Date(2022, 5, 1)]
+R_oth_risk[:, "R other (post. 75%, 4wk reversion)"] = oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)] .+ oth_sx_trans_risk_cred_int4wks.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 
 # plot!(
@@ -1220,8 +1241,8 @@ R_oth_risk[:, "R other (post. 90%, 4wk reversion)"] = oth_sx_trans_risk_cred_int
 #     dates[f:end],
 #     oth_sx_trans_risk_cred_int12wks.mean_pred[f:end],
 #     ribbon=(
-#         oth_sx_trans_risk_cred_int12wks.lb_pred_10[f:end],
-#         oth_sx_trans_risk_cred_int12wks.ub_pred_10[f:end],
+#         oth_sx_trans_risk_cred_int12wks.lb_pred_25[f:end],
+#         oth_sx_trans_risk_cred_int12wks.ub_pred_25[f:end],
 #     ),
 #     lw=3,
 #     fillalpha=0.3,
@@ -1230,8 +1251,8 @@ R_oth_risk[:, "R other (post. 90%, 4wk reversion)"] = oth_sx_trans_risk_cred_int
 # )
 
 R_oth_risk[:, "R other (post. mean, 12wk reversion)"] = oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 10%, 12wk reversion)"] = oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)] .- oth_sx_trans_risk_cred_int12wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 90%, 12wk reversion)"] = oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)] .+ oth_sx_trans_risk_cred_int12wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
+R_oth_risk[:, "R other (post. 25%, 12wk reversion)"] = oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)] .- oth_sx_trans_risk_cred_int12wks.lb_pred_25[dates.>=Date(2022, 5, 1)]
+R_oth_risk[:, "R other (post. 75%, 12wk reversion)"] = oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)] .+ oth_sx_trans_risk_cred_int12wks.lb_pred_25[dates.>=Date(2022, 5, 1)]
 
 
 
@@ -1242,8 +1263,8 @@ vline!(
     color=:black,
     ls=:dot,
     lab="",
-    annotation = (Date(2022, 7, 23) + Day(7), 0.21, "WHO declaration"),
-    annotationrotation = 270
+    annotation=(Date(2022, 7, 23) + Day(7), 0.21, "WHO declaration"),
+    annotationrotation=270
 )
 
 display(plt_chng_oth)
@@ -1267,53 +1288,53 @@ savefig(plt, "plots/risk_over_time" * string(wks[end]) * ".png")
 
 
 
-plt = plot(
-    plt_chng,
-    plt_chng_oth,
-    plt_prev,
-    plt_prev_overall,
-    size=(1750, 1600),
-    dpi=250,
-    left_margin=10mm,
-    bottom_margin=10mm,
-    right_margin=10mm,
-    layout=(2, 2),
-)
-display(plt)
-savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
+# plt = plot(
+#     plt_chng,
+#     plt_chng_oth,
+#     plt_prev,
+#     plt_prev_overall,
+#     size=(1750, 1600),
+#     dpi=250,
+#     left_margin=10mm,
+#     bottom_margin=10mm,
+#     right_margin=10mm,
+#     layout=(2, 2),
+# )
+# display(plt)
+# savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
 
 
 ##Cumulative infections
 
 d1, d2 = size(mpxv_wkly)
 
-cuminf_cred_int = prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions])
+cuminf_cred_int = prev_cred_intervals([cumsum(pred[2], dims=1) for pred in preds_and_incidence_interventions])
 cuminf_cred_int_4wkrev =
-    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_4wkrev])
+    prev_cred_intervals([cumsum(pred[2], dims=1) for pred in preds_and_incidence_interventions_4wkrev])
 cuminf_cred_int_12wkrev =
-    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_12wkrev])
+    prev_cred_intervals([cumsum(pred[2], dims=1) for pred in preds_and_incidence_interventions_12wkrev])
 
 cuminf_cred_int_cvac =
-    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_cvac])
+    prev_cred_intervals([cumsum(pred[2], dims=1) for pred in preds_and_incidence_interventions_cvac])
 cuminf_cred_int_cvac_4wkrev =
-    prev_cred_intervals([cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_cvac_4wkrev])
+    prev_cred_intervals([cumsum(pred[2], dims=1) for pred in preds_and_incidence_interventions_cvac_4wkrev])
 cuminf_cred_int_cvac_12wkrev = prev_cred_intervals([
-    cumsum(pred[2],dims=1) for pred in preds_and_incidence_interventions_cvac_12wkrev
+    cumsum(pred[2], dims=1) for pred in preds_and_incidence_interventions_cvac_12wkrev
 ])
 
 cuminf_cred_int_overall = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for pred in preds_and_incidence_interventions
+    cumsum(sum(pred[2][:, 1:10], dims=2), dims=1) for pred in preds_and_incidence_interventions
 ])
 cuminf_cred_int_overall_4wkrev = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for pred in preds_and_incidence_interventions_4wkrev
+    cumsum(sum(pred[2][:, 1:10], dims=2), dims=1) for pred in preds_and_incidence_interventions_4wkrev
 ])
 
 cuminf_cred_int_overall_12wkrev = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for pred in preds_and_incidence_interventions_12wkrev
+    cumsum(sum(pred[2][:, 1:10], dims=2), dims=1) for pred in preds_and_incidence_interventions_12wkrev
 ])
 
 cuminf_cred_int_overall_cvac_4wkrev = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims=2),dims = 1) for
+    cumsum(sum(pred[2][:, 1:10], dims=2), dims=1) for
     pred in preds_and_incidence_interventions_cvac_4wkrev
 ])
 
@@ -1325,82 +1346,106 @@ _wks = long_wks .- Day(7)
 
 
 exposure = DataFrame()
-date_exposure = Date(2022,10,1)
+date_exposure = Date(2022, 10, 1)
 
 f = findfirst(_wks .>= date_exposure) #Date for plotting exposure
 
 #Population sizes and generate xtick labels
-pop_sizes = [(N_uk - N_msm) ; N_msm_grp[:]]
-prop_inf = [cuminf_cred_int.mean_pred[f,11] / (N_uk - N_msm)  ;cuminf_cred_int.mean_pred[f,1:10] ./ N_msm_grp[:]]
+pop_sizes = [(N_uk - N_msm); N_msm_grp[:]]
+prop_inf = [cuminf_cred_int.mean_pred[f, 11] / (N_uk - N_msm); cuminf_cred_int.mean_pred[f, 1:10] ./ N_msm_grp[:]]
+100 * cuminf_cred_int_overall.mean_pred[f] / N_msm
+100 * (cuminf_cred_int_overall.mean_pred[f] - cuminf_cred_int_overall.lb_pred_25[f]) / N_msm
+100 * (cuminf_cred_int_overall.mean_pred[f] + cuminf_cred_int_overall.ub_pred_25[f]) / N_msm
 
-mnthly_cnts = xs ./ 12 .|> x -> round(x,sigdigits = 2) .|> x -> string(x) .|> str -> str[(end-1):end] == ".0" ? str[1:(end-2)] : str
-xtickstr = Vector{String}(undef,10)
+mnthly_cnts = xs ./ 12 .|> x -> round(x, sigdigits=2) .|> x -> string(x) .|> str -> str[(end-1):end] == ".0" ? str[1:(end-2)] : str
+xtickstr = Vector{String}(undef, 10)
 xtickstr[1] = "< " * mnthly_cnts[1]
 for k = 2:9
     xtickstr[k] = mnthly_cnts[k-1] * "-" * mnthly_cnts[k]
 end
 xtickstr[10] = "> " * mnthly_cnts[10]
-xtickstr = ["non-GBMSM" ; xtickstr]
+xtickstr = ["non-GBMSM"; xtickstr]
 
 
 plt_prop = bar(pop_sizes ./ N_uk,
     yscale=:log10,
     title="Risk groups and proportions infected (1st Oct)",
-    xticks=(1:11,xtickstr),
-    yticks = [1e-5,1e-4,1e-3,1e-2,1e-1,1],
+    xticks=(1:11, xtickstr),
+    yticks=[1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1],
     ylabel="Proportion of population",
     xlabel="Monthly new sexual partners",
-    bar_width = 0.9,
+    bar_width=0.9,
     size=(1600, 600),
-    dpi = 250,
+    dpi=250,
     tickfont=15,
     titlefont=28,
     guidefont=24,
     legendfont=16,
-    left_margin = 15mm,
-    bottom_margin = 15mm,
-    top_margin = 10mm,
-    color = :blue,
+    left_margin=15mm,
+    bottom_margin=15mm,
+    top_margin=10mm,
+    color=:blue,
     lab="Proportion of group uninfected")
 
 bar!(plt_prop,
-    pop_sizes./N_uk,
-    bar_width = prop_inf .* 0.9,
-    yscale = :log10,
-    lab = "Proportion of group infected",
-    color = :red
-    )    
+    pop_sizes ./ N_uk,
+    bar_width=prop_inf .* 0.9,
+    yscale=:log10,
+    lab="Proportion of group infected",
+    color=:red
+)
 
 exposure[:, "Groups"] = xtickstr
 exposure[:, "Proportion of population"] = pop_sizes ./ N_uk
-exposure[:,"Proportion infected (post. mean)"] = prop_inf
-exposure[:,"Proportion infected (post. 10%)"] = [(cuminf_cred_int.mean_pred[f,11] - cuminf_cred_int.lb_pred_10[f,11] )/ (N_uk - N_msm)  ;(cuminf_cred_int.mean_pred[f,1:10] .- cuminf_cred_int.lb_pred_10[f,1:10]) ./ N_msm_grp[:]]
-exposure[:,"Proportion infected (post. 90%)"] = [(cuminf_cred_int.mean_pred[f,11] + cuminf_cred_int.ub_pred_10[f,11] )/ (N_uk - N_msm)  ;(cuminf_cred_int.mean_pred[f,1:10] .+ cuminf_cred_int.ub_pred_10[f,1:10]) ./ N_msm_grp[:]]
+exposure[:, "Proportion infected (post. mean)"] = prop_inf
+exposure[:, "Proportion infected (post. 25%)"] = [(cuminf_cred_int.mean_pred[f, 11] - cuminf_cred_int.lb_pred_25[f, 11]) / (N_uk - N_msm); (cuminf_cred_int.mean_pred[f, 1:10] .- cuminf_cred_int.lb_pred_25[f, 1:10]) ./ N_msm_grp[:]]
+exposure[:, "Proportion infected (post. 75%)"] = [(cuminf_cred_int.mean_pred[f, 11] + cuminf_cred_int.ub_pred_25[f, 11]) / (N_uk - N_msm); (cuminf_cred_int.mean_pred[f, 1:10] .+ cuminf_cred_int.ub_pred_25[f, 1:10]) ./ N_msm_grp[:]]
 
 display(plt_prop)
 CSV.write("projections/population_exposure_" * string(date_exposure) * ".csv", exposure)
 
 
-## New figure 1
+## Main figure 1
 
-layout = @layout [a b;c d; e]
+layout = @layout [a b; c d]
 fig1 = plot(
     plt_R_gbmsm,
     plt_chng_oth,
     plt_msm,
     plt_nmsm,
-    plt_prop,
+    # plt_prop,
     size=(1750, 1600),
     dpi=250,
     left_margin=10mm,
     bottom_margin=10mm,
     right_margin=10mm,
-    top_margin = 5mm,
+    top_margin=5mm,
     layout=layout,
 )
 
 display(fig1)
 savefig(fig1, "plots/main_figure1_" * string(wks[end]) * ".png")
+
+## Main figure 2
+
+layout = @layout [a; b c]
+fig2 = plot(
+    plt_prop,
+    plt_cm_msm,
+    plt_cm_nmsm,
+    size=(1750, 1600),
+    dpi=250,
+    left_margin=10mm,
+    bottom_margin=10mm,
+    right_margin=10mm,
+    top_margin=5mm,
+    layout=layout,
+)
+
+display(fig2)
+savefig(fig2, "plots/main_figure2_" * string(wks[end]) * ".png")
+savefig(fig2, "plots/main_figure2_" * string(wks[end]) * ".svg")
+
 
 ## Plot uncontrolled epidemic
 
@@ -1430,7 +1475,7 @@ plot!(
     plt_msm_unmit,
     long_wks,
     cred_int_unmitigated.mean_pred[:, 1],
-    ribbon=(cred_int_unmitigated.lb_pred_10[:, 1], cred_int_unmitigated.ub_pred_10[:, 1]),
+    ribbon=(cred_int_unmitigated.lb_pred_25[:, 1], cred_int_unmitigated.ub_pred_25[:, 1]),
     lw=3,
     color=:green,
     fillalpha=0.2,
@@ -1448,12 +1493,12 @@ scatter!(
 
 
 case_projections_unmitigated[:, "Projected GBMSM cases (post. mean; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 1]
-case_projections_unmitigated[:, "Projected GBMSM cases (post. 10%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 1] .- cred_int_unmitigated.lb_pred_10[:, 1]
-case_projections_unmitigated[:, "Projected GBMSM cases (post. 90%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 1] .+ cred_int_unmitigated.ub_pred_10[:, 1]
+case_projections_unmitigated[:, "Projected GBMSM cases (post. 25%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 1] .- cred_int_unmitigated.lb_pred_25[:, 1]
+case_projections_unmitigated[:, "Projected GBMSM cases (post. 75%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 1] .+ cred_int_unmitigated.ub_pred_25[:, 1]
 
 case_projections_unmitigated[:, "Projected GBMSM cum. cases (post. mean; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 1]
-case_projections_unmitigated[:, "Projected GBMSM cum. cases (post. 10%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 1] .- cred_int_cum_cases_unmitigated.lb_pred_10[:, 1]
-case_projections_unmitigated[:, "Projected GBMSM cum. cases (post. 90%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 1] .+ cred_int_cum_cases_unmitigated.ub_pred_10[:, 1]
+case_projections_unmitigated[:, "Projected GBMSM cum. cases (post. 25%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 1] .- cred_int_cum_cases_unmitigated.lb_pred_25[:, 1]
+case_projections_unmitigated[:, "Projected GBMSM cum. cases (post. 75%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 1] .+ cred_int_cum_cases_unmitigated.ub_pred_25[:, 1]
 
 display(plt_msm_unmit)
 
@@ -1481,7 +1526,7 @@ plot!(
     plt_nonmsm_unmit,
     long_wks,
     cred_int_unmitigated.mean_pred[:, 2],
-    ribbon=(cred_int_unmitigated.lb_pred_10[:, 2], cred_int_unmitigated.ub_pred_10[:, 2]),
+    ribbon=(cred_int_unmitigated.lb_pred_25[:, 2], cred_int_unmitigated.ub_pred_25[:, 2]),
     lw=3,
     color=:green,
     fillalpha=0.2,
@@ -1499,24 +1544,23 @@ scatter!(
 display(plt_nonmsm_unmit)
 
 case_projections_unmitigated[:, "Projected non-GBMSM cases (post. mean; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 2]
-case_projections_unmitigated[:, "Projected non-GBMSM cases (post. 10%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 2] .- cred_int_unmitigated.lb_pred_10[:, 2]
-case_projections_unmitigated[:, "Projected non-GBMSM cases (post. 90%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 2] .+ cred_int_unmitigated.ub_pred_10[:, 2]
+case_projections_unmitigated[:, "Projected non-GBMSM cases (post. 25%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 2] .- cred_int_unmitigated.lb_pred_25[:, 2]
+case_projections_unmitigated[:, "Projected non-GBMSM cases (post. 75%; unmitigated)"] = cred_int_unmitigated.mean_pred[:, 2] .+ cred_int_unmitigated.ub_pred_25[:, 2]
 
 case_projections_unmitigated[:, "Projected non-GBMSM cum. cases (post. mean; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 2]
-case_projections_unmitigated[:, "Projected non-GBMSM cum. cases (post. 10%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 2] .- cred_int_cum_cases_unmitigated.lb_pred_10[:, 2]
-case_projections_unmitigated[:, "Projected non-GBMSM cum. cases (post. 90%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 2] .+ cred_int_cum_cases_unmitigated.ub_pred_10[:, 2]
+case_projections_unmitigated[:, "Projected non-GBMSM cum. cases (post. 25%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 2] .- cred_int_cum_cases_unmitigated.lb_pred_25[:, 2]
+case_projections_unmitigated[:, "Projected non-GBMSM cum. cases (post. 75%; unmitigated)"] = cred_int_cum_cases_unmitigated.mean_pred[:, 2] .+ cred_int_cum_cases_unmitigated.ub_pred_25[:, 2]
 
 ##
 
 plt_unmit = plot(plt_msm_unmit,
-                plt_nonmsm_unmit,
-                size=(1750, 800),
-                dpi=250,
-                left_margin=10mm,
-                bottom_margin=10mm,
-                right_margin=10mm,
-                layout=(1, 2),
-            )
-savefig(plt_unmit,"plots/unmitigated_mpx.png")
-CSV.write("projections/case_projections_unmitigated_" * string(wks[end]) * ".csv",case_projections_unmitigated)
-            
+    plt_nonmsm_unmit,
+    size=(1750, 800),
+    dpi=250,
+    left_margin=10mm,
+    bottom_margin=10mm,
+    right_margin=10mm,
+    layout=(1, 2),
+)
+savefig(plt_unmit, "plots/unmitigated_mpx.png")
+CSV.write("projections/case_projections_unmitigated_" * string(wks[end]) * ".csv", case_projections_unmitigated)

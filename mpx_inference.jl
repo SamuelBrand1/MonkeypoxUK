@@ -50,9 +50,9 @@ setup_cng_pnt = ABCSMC(MonkeypoxUK.mpx_sim_function_chp, #simulation function
 
 ##Run ABC    
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose=true, progress=true)
-@save("posteriors/smc_posterior_draws_"*string(wks[end])*"_binom_bf.jld2", smc_cng_pnt)
+@save("posteriors/smc_posterior_draws_"*string(wks[end])*".jld2", smc_cng_pnt)
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
-@save("posteriors/posterior_param_draws_"*string(wks[end])*"_binom_bf.jld2", param_draws)
+@save("posteriors/posterior_param_draws_"*string(wks[end])*".jld2", param_draws)
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
