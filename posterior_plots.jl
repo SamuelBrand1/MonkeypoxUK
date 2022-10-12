@@ -21,10 +21,34 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf_vs.jld2")
-# param_draws = [part.params for part in smc.particles]
-param_draws = load("posteriors/posterior_param_draws_2022-09-26_binom_bf.jld2")["param_draws"]
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-12.jld2")
+param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
 
+## Create size distribution plot for the meta population sizes
+n_metapop = 50
+α_metapop_draws = [θ[1] for θ in param_draws]
+size_distribution = α_metapop_draws .|> α -> rand(DirichletMultinomial(N_msm, α * ones(n_cliques)))  |> x -> sort(x, rev = true)
+size_distribution_mat = [size_distribution[i][j] for i = 1:length(size_distribution), j = 1:length(size_distribution[1])]
+mean_sizes = mean(size_distribution_mat, dims=1)[:] #mean(size_distribution_mat,dims = 1)[:]
+lb = mean_sizes .- [quantile(size_distribution_mat[:,metapop],0.025) for metapop = 1:size(size_distribution_mat,2)]
+ub = [quantile(size_distribution_mat[:, metapop], 0.975) for metapop = 1:size(size_distribution_mat, 2)] .- mean_sizes
+
+plt_grp_size = bar(mean_sizes ./ N_msm,
+    yerrors=(lb, ub) ./ N_msm,
+    lab="Posterior mean group size",
+    title="Ordered metapopulation clique sizes",
+    xlabel="Clique size rank",
+    ylabel="Proportion of GBMSM in clique",
+    xticks=[1; 5:5:50],
+    size=(800, 600),dpi = 250,
+    left_margin=5mm,
+    guidefont=16,
+    tickfont=13,
+    titlefont=24,
+    legendfont=16,
+    right_margin=5mm)
+
+savefig(plt_grp_size,"plots/clique_size.png")    
 ##Create transformations to more interpetable parameters
 param_names = [:metapop_size_dispersion, :prob_detect, :mean_inf_period, :prob_transmission,
     :R0_other, :detect_dispersion, :init_infs, :chg_pnt, :sex_trans_red, :other_trans_red,:sex_trans_red_post_WHO, :other_trans_red_post_WHO]
@@ -142,8 +166,8 @@ savefig(post_plt, "posteriors/post_plot" * string(wks[end])  * ".png")
 
 ##
 crn_plt = corner(chn,
-    size=(1500, 1500),
+    size=(2000, 2000),
     left_margin=5mm, right_margin=5mm)
-savefig(crn_plt, "posteriors/post_crnplot" * string(wks[end]) * ".png")
+savefig(crn_plt, "posteriors/post_crnplot" * string(wks[end]) * ".pdf")
 
 ##
