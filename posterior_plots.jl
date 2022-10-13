@@ -21,9 +21,9 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26_binom_bf_vs.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-08-15.jld2")
 # param_draws = [part.params for part in smc.particles]
-param_draws = load("posteriors/posterior_param_draws_2022-09-26_binom_bf.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
 
 ##Create transformations to more interpetable parameters
 param_names = [:metapop_size_dispersion, :prob_detect, :mean_inf_period, :prob_transmission,
