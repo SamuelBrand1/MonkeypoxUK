@@ -17,12 +17,13 @@ A preprint describing the underlying reasoning and methodology is now available 
 7. The script `mpx_inference.jl` covers running the inference methodology. The script `mpxv_datawrangling.jl` loads the underlying case data into a two column matrix `mpxv_wkly` where rows are weeks and first column is reported MSM cases and second column is reported non-MSM cases. The Monday date for each week is given as a `Vector{Date}` array `wks`.
 
 ### Latest case projections for the UK
-<figure>
+This Global.Health monkeypox data set has been depreciated, we will be updating our model with data direct from UKHSA.
+<!-- <figure>
 <img src="plots_globalhealth/case_projections_2022-08-29.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Posterior means and 10-90% posterior probabilities </b></figcaption>
 </figure>
 
-*NB: For the latest (29th August) projections we have swapped from 25-75% prediction intervals to 10-90% prediction intervals.*
+*NB: For the latest (29th August) projections we have swapped from 25-75% prediction intervals to 10-90% prediction intervals.* -->
 
 ### Method Update [15-09-2022]
 
