@@ -58,6 +58,8 @@ seq_forecasts = map((param_draws, wks, mpxv_wkly) -> generate_forecast_projectio
     seq_wks,
     seq_mpxv_wklys)
 
+
+    
 ##
 preds = [[x[1] for x in forecast] for forecast in seq_forecasts]
 seq_creds = MonkeypoxUK.cred_intervals.(preds)
@@ -74,7 +76,7 @@ function add_seqn_forecast!(plt, n; msm::Bool, N=5)
     period = (length(seq_wks[n])):(length(seq_wks[n])+11)
     k = msm ? 1 : 2
     plot!(plt,long_wks[period],seq_creds[n].mean_pred[period, k], color=get(ColorSchemes.cool,n/N),
-    ribbon=(seq_creds[n].lb_pred_25[period, k], seq_creds[n].ub_pred_25[period, k]),
+    ribbon=(seq_creds[n].lb_pred_10[period, k], seq_creds[n].ub_pred_10[period, k]),
     fillalpha = 0.3, legend = :topleft,lab = seq_wks[n][end],lw = 0)
 
     plot!(plt,long_wks[period],seq_creds[n].mean_pred[period, k], color=get(ColorSchemes.cool,n/N),
@@ -153,4 +155,5 @@ fig_seqn_proj = plot(
     top_margin=5mm,
     layout=layout,
 )
+display(fig_seqn_proj)
 savefig(fig_seqn_proj, "plots/seqn_forecasts.png")
