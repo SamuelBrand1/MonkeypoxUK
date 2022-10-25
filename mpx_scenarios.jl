@@ -1359,9 +1359,9 @@ prop_inf = [cuminf_cred_int.mean_pred[f, 11] / (N_uk - N_msm); cuminf_cred_int.m
 
 mnthly_cnts = xs ./ 12 .|> x -> round(x, sigdigits=2) .|> x -> string(x) .|> str -> str[(end-1):end] == ".0" ? str[1:(end-2)] : str
 xtickstr = Vector{String}(undef, 10)
-xtickstr[1] = "< " * mnthly_cnts[1]
-for k = 2:9
-    xtickstr[k] = mnthly_cnts[k-1] * "-" * mnthly_cnts[k]
+# xtickstr[1] = "< " * mnthly_cnts[1]
+for k = 1:9
+    xtickstr[k] = mnthly_cnts[k] * "-" * mnthly_cnts[k+1]
 end
 xtickstr[10] = "> " * mnthly_cnts[10]
 xtickstr = ["non-GBMSM"; xtickstr]
