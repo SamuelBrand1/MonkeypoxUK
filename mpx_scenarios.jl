@@ -9,15 +9,12 @@ using MonkeypoxUK
 include("mpxv_datawrangling_inff.jl");
 include("setup_model.jl");
 
-## Comment out to use latest data rather than reterospective data
+## 
 
-colname = "seqn_fit5"
+colname = "seqn_fit7"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 inferred_prop_na_msm_lwr = past_mpxv_data_inferred[:, "lower_"*colname] |> x -> x[.~ismissing.(x)]
 inferred_prop_na_msm_upr = past_mpxv_data_inferred[:, "upper_"*colname] |> x -> x[.~ismissing.(x)]
-
-# plot(inferred_prop_na_msm[3:end],
-#         ribbon = ( inferred_prop_na_msm[3:end] .- inferred_prop_na_msm_lwr[3:end], inferred_prop_na_msm_upr[3:end] .- inferred_prop_na_msm[3:end]))
 
 
 mpxv_wkly =
@@ -36,13 +33,11 @@ upr_mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
     hcat(inferred_prop_na_msm_upr, 1.0 .- inferred_prop_na_msm_upr) |> Matrix
 
-# std_mpxv_wkly = past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .* (inferred_prop_na_msm) .* (1.0 .- inferred_prop_na_msm)
-# std_mpxv_wkly .+= past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .* (past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .- 1.0) .* 0.02^2
-# std_mpxv_wkly = sqrt.(std_mpxv_wkly)
+
 
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
 ts = wks .|> d -> d - Date(2021, 12, 31) .|> t -> t.value
-# wkly_vaccinations = [zeros(12); 1000; 2000; fill(5000, 23)] * 1.55
+
 wkly_vaccinations = [[zeros(12); 1000; 2000; fill(5000, 4)] * 1.675
     fill(650, 18)
 ]
