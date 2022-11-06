@@ -45,7 +45,7 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 
 ##Load posterior draws
 
-param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
+param_draws = load("posteriors/posterior_param_draws_2022-10-17.jld2")["param_draws"]
 
 ## Public health emergency effect forecasts
 n_lookaheadweeks = 26
