@@ -21,7 +21,7 @@ A second preprint using data directly from the UKHSA, rather than open source da
 ### Latest case projections for the UK
 
 <figure>
-<img src="plots/case_projections_2022-09-26.png" alt="Trulli" style="width:100%">
+<img src="plots/case_projections_2022-10-17.png" alt="Trulli" style="width:100%">
 <figcaption align = "center"><b>Posterior means and 10-90% posterior probabilities </b></figcaption>
 </figure>
 
