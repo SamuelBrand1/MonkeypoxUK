@@ -61,19 +61,20 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
 
     #States
     S = @view u.x[1][1, :, :]
-    E = @view u.x[1][2, :, :]
-    P = @view u.x[1][3, :, :]
+    E = @view u.x[1][2, :, :] #Latent AND pre-symptomatic infectious
+    P = @view u.x[1][3, :, :] #Just pre-symptomatic infectious
     I = @view u.x[1][4, :, :]
     R = @view u.x[1][5, :, :]
     V = @view u.x[1][6, :, :]
     C = @view u.x[1][7, :, :]
 
+    # println(sum(C))
     S_other = u.x[2][1]
-    E_other = u.x[2][2]
-    P_other = u.x[2][3]
+    E_other = u.x[2][2] #Latent AND pre-symptomatic infectious
+    P_other = u.x[2][3] #Just pre-symptomatic infectious
     I_other = u.x[2][4]
     R_other = u.x[2][5]
-
+    # println("non = $(u.x[2][7])")
     #force of infection
     total_I = I_other + sum(I) + ϵ * (P_other + sum(P))
     λ = (p_trans .* (Λ * (I .+ ϵ .* P) * B)) ./ (N_grp_msm .+ 1e-5)
@@ -82,10 +83,13 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
 
     num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-(λ .+ λ_other)))#infections among MSM
     num_infs_vac = map((n, p) -> rand(Binomial(n, p)), V, 1 .- exp.(-(1 - vac_eff) * (λ .+ λ_other)))#infections among MSM with vaccine
-    num_incs = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E)#incubation among MSM
+    num_incs1 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E)#incubation among MSM
+    num_incs2 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), P)#incubation among MSM
     num_recs = map(n -> rand(Binomial(n, 1 - exp(-γ_eff))), I)#recovery among MSM
     num_infs_other = rand(Binomial(S_other, 1 - exp(-λ_other)))#infections among non MSM
-    num_incs_other = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E_other)#incubation among non MSM
+    num_incs_other1 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E_other)#incubation among non MSM
+    num_incs_other2 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), P_other)#incubation among non MSM
+
     num_recs_other = rand(Binomial(I_other, 1 - exp(-γ_eff)))#recovery among non MSM
 
     #create change
@@ -93,22 +97,26 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
     du.x[2] .= u.x[2]
     #infections
     du.x[1][1, :, :] .-= num_infs
-    du.x[1][8, :, :] .-= num_infs_vac
+    du.x[1][6, :, :] .-= num_infs_vac
     du.x[1][2, :, :] .+= num_infs .+ num_infs_vac
     du.x[2][1] -= num_infs_other
     du.x[2][2] += num_infs_other
     #incubations
-    du.x[1][2:5, :, :] .-= num_incs
-    du.x[1][3:6, :, :] .+= num_incs
-    du.x[2][2:5] .-= num_incs_other
-    du.x[2][3:6] .+= num_incs_other
-    du.x[1][9, :, :] .+= num_incs[end, :, :] #cumulative onsets - MSM
-    du.x[2][9] += num_incs_other[end] #cumulative onsets - non-MSM
+    du.x[1][2, :, :] .-= num_incs1
+    du.x[1][3, :, :] .+= num_incs1
+    du.x[1][3, :, :] .-= num_incs2
+    du.x[1][4, :, :] .+= num_incs2
+    du.x[2][2] -= num_incs_other1
+    du.x[2][3] += num_incs_other1
+    du.x[2][3] -= num_incs_other2
+    du.x[2][4] += num_incs_other2
+    du.x[1][7, :, :] .+= num_incs2 #cumulative onsets - MSM
+    du.x[2][7] += num_incs_other2 #cumulative onsets - non-MSM
     #recoveries
-    du.x[1][6, :, :] .-= num_recs
-    du.x[1][7, :, :] .+= num_recs
-    du.x[2][6] -= num_recs_other
-    du.x[2][7] += num_recs_other
+    du.x[1][4, :, :] .-= num_recs
+    du.x[1][5, :, :] .+= num_recs
+    du.x[2][4] -= num_recs_other
+    du.x[2][5] += num_recs_other
 
     return nothing
 end
@@ -131,7 +139,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     # trans_red_other2 = scale_red_other2
 
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
     #Simulate and track error
@@ -149,8 +157,11 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     #Initialise arrays tracking observables and generated quantities of the simulation
     old_onsets = [0, 0]
     new_onsets = [0, 0]
+    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
     wk_num = 1
     detected_cases = zeros(size(wkly_cases))
+    onsets = zeros(size(wkly_cases))
     incidence = zeros(Int64, size(wkly_cases, 1), length(ps) + 1)
 
     #Dynamics
@@ -174,19 +185,23 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
         #Calculate actual onsets, generate observed cases and score errors        
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
+
+        # println(new_onsets)
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
+        onsets[wk_num, :] .= new_onsets #lag 1 week
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
         if wk_num < size(wkly_cases, 1) && wk_num >= 3  # Leave last week out due to right censoring issues and leave out first two weeks due to possible early reporting biases
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
         wk_num += 1
         old_onsets = new_onsets
+        old_sus = new_sus
     end
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, detected_cases, incidence, end_state
+    return L1_rel_err, detected_cases, onsets, incidence, end_state
 end
 
 """

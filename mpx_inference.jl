@@ -4,22 +4,23 @@ using Distributions, StatsBase, StatsPlots
 using LinearAlgebra, RecursiveArrayTools
 using OrdinaryDiffEq, ApproxBayes
 using JLD2, MCMCChains, Roots, Dates
-using CSV, DataFrames, Plots, Plots.PlotMeasures
+using CSV, DataFrames, StatsPlots, Plots.PlotMeasures
 import MonkeypoxUK
 
 ## MSM data with data inference
 
-past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-9-15.csv",
+past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-15.csv",
                                 missingstring = "NA") |> DataFrame
 
 wks = Date.(past_mpxv_data_inferred.week, DateFormat("dd/mm/yyyy"))
 
 ## Set up model
+
 include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
 
-colname = "seqn_fit7"
+colname = "seqn_fit1"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -28,12 +29,13 @@ mpxv_wkly =
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
 
 ## Define priors for the parameters
+
 prior_vect_cng_pnt = [
     Gamma(1, 1), # α_choose 1
     Beta(5, 5), #p_detect  2
     Beta(2, 8), #p_trans  3
     LogNormal(log(0.25), 0.25), #R0_other 4
-    Gamma(3, 1000 / 3),#  M 5
+    Gamma(100, 1000 / 100),#  M 5
     LogNormal(log(5), 1),#init_scale 6
     Uniform(135, 199),# chp_t 7
     Beta(1.5, 1.5),#trans_red 8
@@ -43,8 +45,8 @@ prior_vect_cng_pnt = [
 ]
 
 
-
 ## Use SBC for defining the ABC error target and generate prior predictive plots
+
 ϵ_target, plt_prc, hist_err = MonkeypoxUK.simulation_based_calibration(
     prior_vect_cng_pnt,
     wks,
@@ -55,7 +57,7 @@ prior_vect_cng_pnt = [
 
 setup_cng_pnt = ABCSMC(
     MonkeypoxUK.mpx_sim_function_chp, #simulation function
-    12, # number of parameters
+    length(prior_vect_cng_pnt), # number of parameters
     ϵ_target, #target ϵ derived from simulation based calibration
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1 = 1000,
