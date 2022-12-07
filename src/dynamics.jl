@@ -201,7 +201,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, detected_cases, onsets, incidence, end_state
+    return L1_rel_err, (;detected_cases, onsets, incidence, end_state)
 end
 
 """

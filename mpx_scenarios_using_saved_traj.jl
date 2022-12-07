@@ -1,18 +1,22 @@
 using Distributions, StatsBase, StatsPlots
 using Plots.PlotMeasures, CSV, DataFrames
-using LinearAlgebra, RecursiveArrayTools
+using LinearAlgebra, RecursiveArrayTools, Dates
 using OrdinaryDiffEq, ApproxBayes, MCMCChains
 using JLD2
 using MonkeypoxUK
 
-## Grab UK data and model set up
+## MSM data with data inference
 
-include("mpxv_datawrangling_inff.jl");
+past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
+                                missingstring = "NA") |> DataFrame
+
+wks = Date.(past_mpxv_data_inferred.week, DateFormat("dd/mm/yyyy"))
+
 include("setup_model.jl");
 
 ## 
 
-colname = "seqn_fit7"
+colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 inferred_prop_na_msm_lwr =
     past_mpxv_data_inferred[:, "lower_"*colname] |> x -> x[.~ismissing.(x)]
@@ -45,8 +49,8 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 
 ## Load posterior draws and saved trajectiories
 
-smc = load("posteriors/smc_posterior_draws_2022-10-17.jld2")["smc_cng_pnt"]
-param_draws = load("posteriors/posterior_param_draws_2022-10-17.jld2")["param_draws"]
+smc = load("posteriors/smc_posterior_draws_2022-09-26.jld2")["smc_cng_pnt"]
+param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
 trajs = [particle.other for particle in smc.particles]
 
 ## Public health emergency effect forecasts
@@ -259,15 +263,36 @@ plt_msm = plot(;
 
 plot!(
     plt_msm,
-    wks,
+    wks[1:size(cred_int.mean_pred,1)],
     cred_int.mean_pred[:, 1],
-    ribbon = (cred_int.lb_pred_10[:, 1], cred_int.ub_pred_10[:, 1]),
+    ribbon = (cred_int.lb_pred_25[:, 1], cred_int.ub_pred_25[:, 1]),
     lw = 3,
     color = :black,
-    fillalpha = 0.2,
+    fillalpha = 0.15,
     lab = "12 week reversion",
 )
 
+plot!(
+    plt_msm,
+    wks[1:size(cred_int.mean_pred,1)],
+    cred_int.mean_pred[:, 1],
+    ribbon = (cred_int.lb_pred_10[:, 1], cred_int.ub_pred_10[:, 1]),
+    lw = 0,
+    color = :black,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks[1:size(cred_int.mean_pred,1)],
+    cred_int.mean_pred[:, 1],
+    ribbon = (cred_int.lb_pred_025[:, 1], cred_int.ub_pred_025[:, 1]),
+    lw = 0,
+    color = :black,
+    fillalpha = 0.15,
+    lab = "",
+)
 
 scatter!(
     plt_msm,
