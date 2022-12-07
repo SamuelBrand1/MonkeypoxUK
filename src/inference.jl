@@ -13,7 +13,7 @@ function simulation_based_calibration(prior_vect, wks, mpxv_wkly, constants; sav
     prior_sims = map(θ -> MonkeypoxUK.mpx_sim_function_chp(θ, constants, mpxv_wkly), draws)
 
     ##Prior predictive checking - simulation
-    prior_preds = [sim[2] for sim in prior_sims]
+    prior_preds = [sim[2].detected_cases for sim in prior_sims]
     plt_priorpredcheck = plot(; ylabel="Weekly cases",
         title="Prior predictive checking")
     for pred in prior_preds
@@ -26,7 +26,7 @@ function simulation_based_calibration(prior_vect, wks, mpxv_wkly, constants; sav
     if verbose
         println("Starting model-based calibration")
     end
-    mbc_errs = map(n -> MonkeypoxUK.mpx_sim_function_chp(draws[n], constants, prior_sims[n][2])[1], 1:1000)
+    mbc_errs = map(n -> MonkeypoxUK.mpx_sim_function_chp(draws[n], constants, prior_sims[n][2].detected_cases)[1], 1:1000)
 
     ##Find target tolerance and plot error distribution
     ϵ_target = find_zero(x -> target_perc - sum(mbc_errs .< x) / length(mbc_errs), (0, 5))
