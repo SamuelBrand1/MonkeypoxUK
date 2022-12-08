@@ -1,11 +1,27 @@
-using Distributions, StatsBase, StatsPlots
+using Distributions, StatsBase, StatsPlots, Plots.PlotMeasures
 using LinearAlgebra, RecursiveArrayTools
-using OrdinaryDiffEq, ApproxBayes, CSV, DataFrames
+using OrdinaryDiffEq, ApproxBayes, CSV, DataFrames, Dates
 using JLD2, MCMCChains
 using MonkeypoxUK
 
 ## Grab UK data and setup model
-include("mpxv_datawrangling_inff.jl");
+past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
+                                missingstring = "NA") |> DataFrame
+
+colname = "seqn_fit5"
+inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
+mpxv_wkly =
+    past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
+    past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
+    hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm) |> Matrix
+
+wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
+                                
+# Leave out first two weeks because reporting changed in early May
+mpxv_wkly = mpxv_wkly[3:end, :]
+wks = wks[3:end]
+## Set up model
+
 include("setup_model.jl");
 
 ## Comment out to use latest data rather than reterospective data
@@ -23,7 +39,7 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-12.jld2")
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26.jld2")
 param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
 
 ## Create size distribution plot for the meta population sizes
@@ -65,13 +81,12 @@ plt_grp_size = bar(
     legendfont = 16,
     right_margin = 5mm,
 )
-
+display(plt_grp_size)
 savefig(plt_grp_size, "plots/clique_size.png")
 ##Create transformations to more interpetable parameters
 param_names = [
     :metapop_size_dispersion,
     :prob_detect,
-    :mean_inf_period,
     :prob_transmission,
     :R0_other,
     :detect_dispersion,
@@ -84,10 +99,7 @@ param_names = [
 ]
 
 transformations = [
-    fill(x -> x, 2)
-    # x -> 1 + mean(Geometric(1 / (1 + x))) # Translate the infectious period parameter into mean infectious period
-    x -> x
-    fill(x -> x, 2)
+    fill(x -> x, 4)
     x -> 1 / (x + 1) #Translate "effective sample size" for Beta-Binomial on sampling to overdispersion parameter
     fill(x -> x, 4)
     fill(x -> x, 2)
