@@ -51,32 +51,21 @@ function mpx_sim_function_projections(params, constants, wkly_cases, interventio
     wk_num = 1
     detected_cases = zeros(weeks_to_project, 2)
     incidence = zeros(Int64, weeks_to_project, 11)
-    not_changed = true
-    not_changed2 = true
+    
 
     #Step through the dynamics
     while wk_num <= weeks_to_project #Step forward a week
-        #Change points
-        if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
-            not_changed = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce non-sexual transmission after the change point
-        end
-        if not_changed2 && mpx_init.t > chp_t2 ##2nd change point for transmission 
-            not_changed2 = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
-        end
-        #Step forward a week in time and implement reversion to normal transmission
-        # step!(mpx_init, 7)
-        # if wk_num >= 19 && mpx_init.p[1] < p_trans  #Reversion starts first week in September
-        #     mpx_init.p[1] *= wkly_reversion
-        #     mpx_init.p[2] *= wkly_reversion_othr
-        # end
-        for stp = 1:7
+        
+        for day = 1:7
+            #Calculate effective transmission rates for each day of transmission
+            if t < (Date(2022,9,1) - Date(2021,12,31)).value
+                mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) * (1 - trans_red2)
+                mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) * (1 - trans_red_other2)
+            else
+                mpx_init.p[1] = p_min + (p_trans - p_min) * sigmoid((mpx_init.t - T₅₀)/κ_rev)
+                mpx_init.p[2] = R_oth_min + (R0_other - R_oth_min) * sigmoid((mpx_init.t - T₅₀)/κ_rev)
+            end
             step!(mpx_init, 1)
-            mpx_init.p[1] += (p_trans - p_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
-            mpx_init.p[2] += (R0_other - R_oth_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
         end
 
         #Do vaccine uptake
@@ -85,7 +74,7 @@ function mpx_sim_function_projections(params, constants, wkly_cases, interventio
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
         num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
-        du_vac.x[1][8, 3:end, :] .+= num_vaccines
+        du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
@@ -94,10 +83,8 @@ function mpx_sim_function_projections(params, constants, wkly_cases, interventio
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= Float64.(actual_obs)
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
-        end
-        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][2:6, n, :]) for n = 1:10]; sum(mpx_init.u.x[2][2:6])]
+        
+        
 
         #Move time forwards one week
         wk_num += 1
@@ -105,5 +92,5 @@ function mpx_sim_function_projections(params, constants, wkly_cases, interventio
         old_sus = new_sus
     end
 
-    return L1_rel_err, detected_cases, incidence, prevalence
+    return (;detected_cases, incidence)
 end

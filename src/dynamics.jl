@@ -197,15 +197,16 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
         #Calculate actual onsets, generate observed cases and score errors        
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-
-        # println(new_onsets)
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         onsets[wk_num, :] .= new_onsets #lag 1 week
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
+        
         if wk_num < size(wkly_cases, 1)  # Leave last week out due to right censoring issues 
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
+        
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
