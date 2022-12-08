@@ -12,21 +12,25 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-wks = Date.(past_mpxv_data_inferred.week, DateFormat("dd/mm/yyyy"))
-
-## Set up model
-
-include("setup_model.jl");
-
-## Comment out to use latest data rather than reterospective data
-
 colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"] .*
     hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm) |> Matrix
+
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
+                                
+# Leave out first two weeks because reporting changed in early May
+mpxv_wkly = mpxv_wkly[3:end, :]
+wks = wks[3:end]
+## Set up model
+
+include("setup_model.jl");
+
+## Comment out to use latest data rather than reterospective data
+
+
 
 ## Define priors for the parameters
 
@@ -79,11 +83,14 @@ param_draws = [particle.params for particle in smc_cng_pnt.particles]
 ##posterior predictive checking - simple plot to see coherence of model with data
 
 
-post_preds = [part.other for part in smc_cng_pnt.particles]
+post_preds = [part.other.detected_cases for part in smc_cng_pnt.particles]
 plt = plot(; ylabel = "Weekly cases", title = "Posterior predictive checking")
 for pred in post_preds
 
-    plot!(plt, wks[3:end], pred[3:end,:], lab = "", color = [1 2], alpha = 0.1)
+    plot!(plt, wks[1:end], pred[1:end,:], lab = "", color = [1 2], alpha = 0.1)
 end
-scatter!(plt, wks[3:end], mpxv_wkly[3:end,:], lab = ["Data: (MSM)" "Data: (non-MSM)"], ylims = (0, 800))
+scatter!(plt, wks[1:end], mpxv_wkly[1:end,:], lab = ["Data: (MSM)" "Data: (non-MSM)"], ylims = (0, 800))
 display(plt)
+
+
+## Run fits 

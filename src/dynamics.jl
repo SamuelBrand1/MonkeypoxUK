@@ -133,7 +133,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     #Get parameters and make parameter transformations transformations
     α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
-
+    # vac_effectiveness = rand(Uniform(0.7,0.85))
     κ = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
     # trans_red2 = scale_trans_red2
     # trans_red_other2 = scale_red_other2
@@ -163,9 +163,20 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     detected_cases = zeros(size(wkly_cases))
     onsets = zeros(size(wkly_cases))
     incidence = zeros(Int64, size(wkly_cases, 1), length(ps) + 1)
+    state_pre_vaccine = similar(u_mpx)
+    state_sept = similar(u_mpx)
+    wk_vac = findfirst(wkly_vaccinations .> 0)
+    wk_sept = findfirst(ts .> 244)
 
     #Dynamics
     while wk_num <= size(wkly_cases, 1)
+        #Save states at important moments
+        if wk_num == wk_vac
+            state_pre_vaccine = deepcopy(mpx_init.u)
+        end
+        if wk_num == wk_sept
+            state_sept = deepcopy(mpx_init.u)
+        end
         #Step dynamics forward a week
         for day in 1:7 
             #Calculate effective transmission rates for each day of transmission
@@ -173,6 +184,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
             mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red_other2)
             step!(mpx_init, 1) # Dynamics for day
         end 
+       
 
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
@@ -191,7 +203,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         onsets[wk_num, :] .= new_onsets #lag 1 week
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        if wk_num < size(wkly_cases, 1) && wk_num >= 3  # Leave last week out due to right censoring issues and leave out first two weeks due to possible early reporting biases
+        if wk_num < size(wkly_cases, 1)  # Leave last week out due to right censoring issues 
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
         wk_num += 1
@@ -201,7 +213,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, (;detected_cases, onsets, incidence, end_state)
+    return L1_rel_err, (;detected_cases, onsets, incidence, vac_effectiveness, state_pre_vaccine, state_sept, end_state)
 end
 
 """
