@@ -181,7 +181,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         for day in 1:7 
             #Calculate effective transmission rates for each day of transmission
             mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red2)
-            mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) : R0_other * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red_other2)
+            mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red_other2)
             step!(mpx_init, 1) # Dynamics for day
         end 
        
