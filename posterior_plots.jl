@@ -139,34 +139,16 @@ function construct_next_gen_mat(
     vac_eff::Union{Nothing,Number} = nothing,
 )
     #Get parameters 
-    α_choose,
-    p_detect,
-    mean_inf_period,
-    p_trans,
-    R0_other,
-    M,
-    init_scale,
-    chp_t,
-    trans_red,
-    trans_red_other,
-    scale_trans_red2,
-    scale_red_other2 = params
+    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+
     #Get constant data
-    N_total,
-    N_msm,
-    ps,
-    ms,
-    ingroup,
-    ts,
-    α_incubation,
-    n_cliques,
-    wkly_vaccinations,
-    vac_effectiveness,
-    chp_t2 = copy(constants)
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
+
 
     if ~isnothing(vac_eff)
         vac_effectiveness = vac_eff
     end
+    mean_inf_period = epsilon * (1 / (1 - exp(-α_incubation))) + (1 / (1 - exp(-γ_eff)))
 
     #Calculate next gen matrix G_ij = E[#Infections in group j due to a single infected person in group i]
     _A =
@@ -205,7 +187,6 @@ prior_val_mat = col_transformations(prior_val_mat, transformations)
 pretty_parameter_names = [
     "Metapop. size dispersion",
     "Prob. of detection",
-    "Mean dur. infectious",
     "Prob. trans. per sexual contact",
     "Non-sexual R0",
     "Prob. of detect. dispersion",

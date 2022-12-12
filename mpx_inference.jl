@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit5"
+colname = "seqn_fit1"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -28,10 +28,6 @@ wks = wks[3:end]
 
 include("setup_model.jl");
 
-## Comment out to use latest data rather than reterospective data
-
-
-
 ## Define priors for the parameters
 
 prior_vect_cng_pnt = [
@@ -44,8 +40,8 @@ prior_vect_cng_pnt = [
     Uniform(135, 199),# chp_t 7
     Beta(1.5, 1.5),#trans_red 8
     Beta(1.5, 1.5),#trans_red_other 9
-    Beta(0.5, 0.5),#trans_red WHO  10 
-    Beta(0.5, 0.5),#trans_red_other WHO 11
+    Beta(1.5, 1.5),#trans_red WHO  10 
+    Beta(1.5, 1.5),#trans_red_other WHO 11
 ]
 
 
@@ -70,15 +66,28 @@ setup_cng_pnt = ABCSMC(
     α = 0.3,
     kernel = gaussiankernel,
     constants = constants,
-    maxiterations = 10^6,
+    maxiterations = 5 * 10^5,
 )
 
-##Run ABC    
+##Run ABC and save results   
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
-@save("posteriors/smc_posterior_draws_" * string(wks[end]) * ".jld2", smc_cng_pnt)
+@save("posteriors/smc_posterior_draws_" * string(wks[end]) * ".jld2", smc_cng_pnt) #<--- this can be too large
+##
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_param_draws_" * string(wks[end]) * ".jld2", param_draws)
+detected_cases = [particle.other.detected_cases for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_detected_cases_" * string(wks[end]) * ".jld2", detected_cases)
+onsets = [particle.other.onsets for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_onsets_" * string(wks[end]) * ".jld2", onsets)
+end_states = [particle.other.end_state for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_end_states_" * string(wks[end]) * ".jld2", end_states)
+begin_vac_states = [particle.other.state_pre_vaccine for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_begin_vac_states_" * string(wks[end]) * ".jld2", begin_vac_states)
+begin_sept_states = [particle.other.state_sept for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_begin_sept_states_" * string(wks[end]) * ".jld2", begin_sept_states)
+vac_effectivenesses = [particle.other.vac_effectiveness for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_vac_effectivenesses_" * string(wks[end]) * ".jld2", vac_effectivenesses)
 
 ##posterior predictive checking - simple plot to see coherence of model with data
 
