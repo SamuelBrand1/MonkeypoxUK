@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit1"
+colname = "seqn_fit2"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -100,6 +100,3 @@ for pred in post_preds
 end
 scatter!(plt, wks[1:end], mpxv_wkly[1:end,:], lab = ["Data: (MSM)" "Data: (non-MSM)"], ylims = (0, 800))
 display(plt)
-
-
-## Run fits 
