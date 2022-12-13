@@ -189,19 +189,17 @@ Calculate the R₀ and (instaneous) R_t for GBMSM and non-GBMSM, with a 1% -> 99
 function reproductive_ratios(
     params,
     constants,
-    interventions,
+    wkly_vaccinations,
+    vac_effectiveness,
     incidence,
     weeks_to_reversion,
+    wks,
     ts;
-    av_cnt_rate=mean(mean_daily_cnts),
-    reversion_time=(Date(2022, 9, 1) - Date(2021, 12, 31)).value
+    av_cnt_rate = mean(mean_daily_cnts),
+    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value
 )
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
-
-    # #Get intervention data
-    wkly_vaccinations = interventions.wkly_vaccinations
-    vac_effectiveness = interventions.vac_effectiveness
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, _, __, chp_t2, weeks_to_change = constants
 
     # #Get parameters and make transformations
     α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
@@ -215,28 +213,35 @@ function reproductive_ratios(
     κ_rev = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
     # Calculate prop susceptibles
-
+    
     cum_infections = cumsum(incidence,dims = 1)
-    cum_eff_vacs = cumsum(wkly_vaccinations) .* vac_effectiveness .* ([0.0; 0.0; N_msm[3:end]] ./ sum(N_msm[3:end]))'
+    cum_eff_vacs = cumsum(wkly_vaccinations) .* 0.0 .* ([0.0; 0.0; ps[3:end]; 0.0] ./ sum(ps[3:end]))'
+    S_msm = (cum_infections + cum_eff_vacs[1:size(cum_infections, 1), :]) ./ [N_msm .* ps; N_total - N_msm]' #Weekly susceptibles
+    return S_msm
+    # interp_log_susceptibility = CubicSpline(log.(S_msm), wks .|> d -> (d - Date(2021, 12, 31)).value |> Float64)
 
-    S_msm = 
+    # # Calculate 
+    # R₀_gbmsm = Vector{Float64}(undef, length(ts))
+    # R₀_ngbmsm = Vector{Float64}(undef, length(ts))
+    # Rₜ_gbmsm = Vector{Float64}(undef, length(ts))
+    # Rₜ_ngbmsm = Vector{Float64}(undef, length(ts))
 
-    # Calculate 
-    R₀_gbmsm = Vector{Float64}(undef, length(ts))
-    R₀_ngbmsm = Vector{Float64}(undef, length(ts))
-    Rₜ_gbmsm = Vector{Float64}(undef, length(ts))
-    Rₜ_ngbmsm = Vector{Float64}(undef, length(ts))
+    # for (i, t) in enumerate(ts)
+    #     susceptibility = exp(interp_log_susceptibility(t))
+    #     if t < reversion_time
+    #         R₀_gbmsm[i] = t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) * (1 - trans_red2)
+    #         R₀_ngbmsm[i] = t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+    #         R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
+    #         Rₜ_gbmsm[i] = susceptibility * R₀_gbmsm[i]
+    #         Rₜ_ngbmsm[i] = susceptibility * R₀_ngbmsm[i]
+    #     else
+    #         R₀_gbmsm[i] = p_min + (p_trans - p_min) * sigmoid((t - T₅₀)/κ_rev)
+    #         R₀_ngbmsm[i] = R_oth_min + (R0_other - R_oth_min) * sigmoid((t - T₅₀)/κ_rev)
+    #         R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
+    #         Rₜ_gbmsm[i] = susceptibility * R₀_gbmsm[i]
+    #         Rₜ_ngbmsm[i] = susceptibility * R₀_ngbmsm[i]
+    #     end
+    # end
 
-    for (i, t) in enumerate(ts)
-        if t < reversion_time
-            R₀_gbmsm[i] = t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) * (1 - trans_red2)
-            R₀_ngbmsm[i] = t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng))  * (1 - trans_red_other2)
-        else
-            R₀_gbmsm[i] = p_min + (p_trans - p_min) * sigmoid((t - T₅₀)/κ_rev)
-            R₀_ngbmsm[i] = R_oth_min + (R0_other - R_oth_min) * sigmoid((t - T₅₀)/κ_rev)
-        end
-    end
-
-
-    return mean_inf_period .* av_cnt_rate .* pₜ
+    # return (;R₀_gbmsm, R₀_ngbmsm, Rₜ_gbmsm, Rₜ_ngbmsm)
 end

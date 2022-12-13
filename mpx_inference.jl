@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit2"
+colname = "seqn_fit4"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -74,12 +74,15 @@ setup_cng_pnt = ABCSMC(
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
 @save("posteriors/smc_posterior_draws_" * string(wks[end]) * ".jld2", smc_cng_pnt) #<--- this can be too large
 ##
+
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_param_draws_" * string(wks[end]) * ".jld2", param_draws)
 detected_cases = [particle.other.detected_cases for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_detected_cases_" * string(wks[end]) * ".jld2", detected_cases)
 onsets = [particle.other.onsets for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_onsets_" * string(wks[end]) * ".jld2", onsets)
+incidences = [particle.other.incidence for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_incidences_" * string(wks[end]) * ".jld2", incidences)
 end_states = [particle.other.end_state for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_end_states_" * string(wks[end]) * ".jld2", end_states)
 begin_vac_states = [particle.other.state_pre_vaccine for particle in smc_cng_pnt.particles]

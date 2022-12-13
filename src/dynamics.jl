@@ -78,7 +78,7 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
     #force of infection
     total_I = I_other + sum(I) + ϵ * (P_other + sum(P))
     λ = (p_trans .* (Λ * (I .+ ϵ .* P) * B)) ./ (N_grp_msm .+ 1e-5)
-    λ_other = γ_eff * R0_other * total_I / N_total
+    λ_other = (1 - exp(-γ_eff)) * R0_other * total_I / N_total
     #number of events
 
     num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-(λ .+ λ_other)))#infections among MSM
@@ -177,6 +177,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         if wk_num == wk_sept
             state_sept = deepcopy(mpx_init.u)
         end
+
         #Step dynamics forward a week
         for day in 1:7 
             #Calculate effective transmission rates for each day of transmission
@@ -185,7 +186,6 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
             step!(mpx_init, 1) # Dynamics for day
         end 
        
-
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
