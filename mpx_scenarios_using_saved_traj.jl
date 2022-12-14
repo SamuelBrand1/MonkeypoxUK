@@ -349,12 +349,10 @@ display(plt_msm)
 
 ##
 
-
 plt_nmsm = plot(;
     ylabel = "Weekly cases",
-    title = "UK Monkeypox Case Projections (non-GBMSM)",# yscale=:log10,
+    title = "UK Monkeypox Case Projections (non-GBMSM)",
     legend = :topright,
-    # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
     ylims = (-1, 100),
     xticks = (
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
@@ -513,6 +511,7 @@ scatter!(
         upr_mpxv_wkly[3:(end-1), 2] .- mpxv_wkly[3:(end-1), 2],
     ),
 )
+
 display(plt_nmsm)
 
 ## Change in transmission over time
@@ -630,6 +629,7 @@ dates = [Date(2021, 12, 31) + Day(t) for t in ts_risk]
 f = findfirst(dates .== Date(2022, 7, 23))
 
 ## Posterior probability of >10% decrease in risk
+
 p_sx_risk_pheic = mean([p_trans[f] < p_trans[1] * 0.9 for p_trans in p_sx_trans_risks])
 
 sx_cnt_trans_risk = DataFrame()

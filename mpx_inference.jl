@@ -83,6 +83,8 @@ onsets = [particle.other.onsets for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_onsets_" * string(wks[end]) * ".jld2", onsets)
 incidences = [particle.other.incidence for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_incidences_" * string(wks[end]) * ".jld2", incidences)
+susceptibilities = [particle.other.susceptibility for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_susceptibilities_" * string(wks[end]) * ".jld2", susceptibilities)
 end_states = [particle.other.end_state for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_end_states_" * string(wks[end]) * ".jld2", end_states)
 begin_vac_states = [particle.other.state_pre_vaccine for particle in smc_cng_pnt.particles]

@@ -56,10 +56,10 @@ Daily stochastic dynamics of the MPX model. NB: the state object `u` is an `Arra
 
 """
 function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
-    #Parameters
+    # Parameters
     p_trans, R0_other, γ_eff, α_incubation, vac_eff = p
 
-    #States
+    # States
     S = @view u.x[1][1, :, :]
     E = @view u.x[1][2, :, :] #Latent AND pre-symptomatic infectious
     P = @view u.x[1][3, :, :] #Just pre-symptomatic infectious
@@ -68,23 +68,23 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
     V = @view u.x[1][6, :, :]
     C = @view u.x[1][7, :, :]
 
-    # println(sum(C))
     S_other = u.x[2][1]
     E_other = u.x[2][2] #Latent AND pre-symptomatic infectious
     P_other = u.x[2][3] #Just pre-symptomatic infectious
     I_other = u.x[2][4]
     R_other = u.x[2][5]
-    # println("non = $(u.x[2][7])")
-    #force of infection
+
+    # Force of infection
     total_I = I_other + sum(I) + ϵ * (P_other + sum(P))
     λ = (p_trans .* (Λ * (I .+ ϵ .* P) * B)) ./ (N_grp_msm .+ 1e-5)
     λ_other = (1 - exp(-γ_eff)) * R0_other * total_I / N_total
-    #number of events
 
-    num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-(λ .+ λ_other)))#infections among MSM
-    num_infs_vac = map((n, p) -> rand(Binomial(n, p)), V, 1 .- exp.(-(1 - vac_eff) * (λ .+ λ_other)))#infections among MSM with vaccine
-    num_incs1 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E)#incubation among MSM
-    num_incs2 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), P)#incubation among MSM
+    # Number of events
+
+    num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-(λ .+ λ_other))) # infections among MSM
+    num_infs_vac = map((n, p) -> rand(Binomial(n, p)), V, 1 .- exp.(-(1 - vac_eff) * (λ .+ λ_other))) # infections among MSM with vaccine
+    num_incs1 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E) # incubation among MSM
+    num_incs2 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), P) # incubation among MSM
     num_recs = map(n -> rand(Binomial(n, 1 - exp(-γ_eff))), I)#recovery among MSM
     num_infs_other = rand(Binomial(S_other, 1 - exp(-λ_other)))#infections among non MSM
     num_incs_other1 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E_other)#incubation among non MSM
@@ -92,7 +92,7 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
 
     num_recs_other = rand(Binomial(I_other, 1 - exp(-γ_eff)))#recovery among non MSM
 
-    #create change
+    # Create change
     du.x[1] .= u.x[1]
     du.x[2] .= u.x[2]
     #infections
@@ -150,7 +150,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     u_mpx = ArrayPartition(u0_msm, u0_other)
     prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon), #Simulation update function
                             u_mpx, #Initial state
-                            (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#Start week before detection
+                            (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)), #Start week before detection
                             [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness]) #Basic simulation parameters
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
 
@@ -163,6 +163,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
     detected_cases = zeros(size(wkly_cases))
     onsets = zeros(size(wkly_cases))
     incidence = zeros(Int64, size(wkly_cases, 1), length(ps) + 1)
+    susceptibility = zeros(Int64, size(wkly_cases, 1), length(ps) + 1)
     state_pre_vaccine = similar(u_mpx)
     state_sept = similar(u_mpx)
     wk_vac = findfirst(wkly_vaccinations .> 0)
@@ -202,7 +203,8 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         onsets[wk_num, :] .= new_onsets #lag 1 week
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        
+        susceptibility[wk_num, :] .= (new_sus .+ (1 - vac_effectiveness) .* [sum(mpx_init.u.x[1][6, :, :][:,:],dims = 2)[:]; 0]) ./ [N_msm .* ps; N_total - N_msm]
+
         if wk_num < size(wkly_cases, 1)  # Leave last week out due to right censoring issues 
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
@@ -214,7 +216,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, (;detected_cases, onsets, incidence, vac_effectiveness, state_pre_vaccine, state_sept, end_state)
+    return L1_rel_err, (;detected_cases, onsets, incidence, susceptibility, vac_effectiveness, state_pre_vaccine, state_sept, end_state)
 end
 
 """
@@ -340,8 +342,6 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
     T₅₀ = (Date(2022,9,1) - Date(2021,12,31)).value + (weeks_to_reversion * 7 / 2) # 50% return to normal point
     κ = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
-    # wkly_reversion = exp(-(log(1 - trans_red) + log(1 - trans_red2))/weeks_to_reversion)
-    # wkly_reversion_othr = exp(-(log(1 - trans_red_other) + log(1 - trans_red_other2))/weeks_to_reversion)
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
     Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
@@ -382,11 +382,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
             mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
         end
         #Step forward a week in time and implement reversion to normal transmission
-        # step!(mpx_init, 7)
-        # if wk_num >= 19 && mpx_init.p[1] < p_trans  #Reversion starts first week in September
-        #     mpx_init.p[1] *= wkly_reversion
-        #     mpx_init.p[2] *= wkly_reversion_othr
-        # end
+
         for stp = 1:7
             step!(mpx_init, 1)
             mpx_init.p[1] += (p_trans - p_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
