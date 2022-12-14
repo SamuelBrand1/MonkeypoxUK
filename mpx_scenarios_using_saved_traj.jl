@@ -174,13 +174,19 @@ cred_int_12wk_no_vacs = MonkeypoxUK.cred_intervals([proj.detected_cases for proj
 cred_int_4wk = MonkeypoxUK.cred_intervals([proj.detected_cases for proj in projections_reversions_4wk_rev], central_est = :median)
 cred_int_4wk_no_vacs = MonkeypoxUK.cred_intervals([proj.detected_cases for proj in projections_reversions_4wk_rev_no_vac], central_est = :median)
 
+cum_cred_int = MonkeypoxUK.cred_intervals(cumsum(detected_cases, dims = 1), central_est = :median)
+cum_cred_int_12wk = MonkeypoxUK.cred_intervals([proj.detected_cases for proj in projections_reversions_12wk_rev] .|> x -> cumsum(x, dims = 1),central_est = :median)
+cum_cred_int_12wk_no_vacs = MonkeypoxUK.cred_intervals([proj.detected_cases for proj in projections_reversions_12wk_rev_no_vac] .|> x -> cumsum(x, dims = 1), central_est = :median)
+cum_cred_int_4wk = MonkeypoxUK.cred_intervals([proj.detected_cases for proj in projections_reversions_4wk_rev] .|> x -> cumsum(x, dims = 1), central_est = :median)
+cum_cred_int_4wk_no_vacs = MonkeypoxUK.cred_intervals([proj.detected_cases for proj in projections_reversions_4wk_rev_no_vac] .|> x -> cumsum(x, dims = 1), central_est = :median)
+
+
 ## MSM projections
 
 plt_msm = plot(;
     ylabel = "Weekly cases",
-    title = "UK Monkeypox Case Projections (GBMSM)",# yscale=:log10,
+    title = "UK Monkeypox Case Projections (GBMSM)",
     legend = :topright,
-    # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
     ylims = (-5, 700),
     xticks = (
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
@@ -312,7 +318,6 @@ plot!(
     plt_msm,
     wks_no_vacs,
     cred_int_4wk_no_vacs.median_pred[:, 1],
-    # ribbon = (cred_int_12wk.lb_pred_25[:, 1], cred_int_12wk.ub_pred_25[:, 1]),
     lw = 3,
     color = :red,
     ls = :dash,
@@ -516,165 +521,36 @@ display(plt_nmsm)
 
 ## Change in transmission over time
 
-long_wks_reversion = [wks[3:(end-3)]; wks_reversion]
-ts_reversion = long_wks_reversion .|> d -> (d - Date(2021,12,31)).value |> Float64
-incidences_12wk_rev = [proj.incidence for proj in projections_reversions_12wk_rev]
+long_wks_reversion = [wks[1:(end-3)]; wks_reversion]
+ts_reversion = (long_wks_reversion[1] - Date(2021,12,31)).value:1.0:(long_wks_reversion[end] - Date(2021,12,31)).value
 
-incidences_reversions = [[incidences[k][1:(end-3),:]; incidences_12wk_rev[k]] for k = 1:2000]
+transmission_risks_with_vaccines_no_rev = map(θ -> reproductive_ratios(θ, constants, ts_reversion),param_draws)
+transmission_risks_with_vaccines_12wk_rev = map(θ -> reproductive_ratios(θ, constants, 12, ts_reversion),param_draws)
+transmission_risks_with_vaccines_4wk_rev = map(θ -> reproductive_ratios(θ, constants, 4, ts_reversion),param_draws)
 
+creds_R0_gbmsm_no_rev =  matrix_cred_intervals([reshape(R.R₀_gbmsm, length(R.R₀_gbmsm), 1) for R in transmission_risks_with_vaccines_no_rev], central_est = :median)
+creds_R0_ngbmsm_no_rev =  matrix_cred_intervals([reshape(R.R₀_ngbmsm, length(R.R₀_gbmsm), 1) for R in transmission_risks_with_vaccines_no_rev], central_est = :median)
+creds_R0_gbmsm_12wk =  matrix_cred_intervals([reshape(R.R₀_gbmsm, length(R.R₀_gbmsm), 1) for R in transmission_risks_with_vaccines_12wk_rev], central_est = :median)
+creds_R0_ngbmsm_12wk =  matrix_cred_intervals([reshape(R.R₀_ngbmsm, length(R.R₀_gbmsm), 1) for R in transmission_risks_with_vaccines_12wk_rev], central_est = :median)
+creds_R0_gbmsm_4wk =  matrix_cred_intervals([reshape(R.R₀_gbmsm, length(R.R₀_gbmsm), 1) for R in transmission_risks_with_vaccines_4wk_rev], central_est = :median)
+creds_R0_ngbmsm_4wk =  matrix_cred_intervals([reshape(R.R₀_ngbmsm, length(R.R₀_gbmsm), 1) for R in transmission_risks_with_vaccines_4wk_rev], central_est = :median)
+##
 
-transmission_risks_with_vaccines_12wk_rev = map((θ,vac_eff,incidence) -> reproductive_ratios(θ, constants, wkly_vaccinations[3:end], vac_eff, incidence, 12, long_wks_reversion, ts_reversion),
-                                                param_draws,
-                                                vac_effs,
-                                                incidences_reversions
-                                                )
-
-p_sx_trans_risks =
-    map(
-        (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
-            p_tr,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-        ),
-        prob_trans,
-        red_sx_trans,
-        red_sx_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-
-p_sx_trans_risks_4wk =
-    map(
-        (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
-            p_tr,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-            4 * 7,
-        ),
-        prob_trans,
-        red_sx_trans,
-        red_sx_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-R_gbmsm_4wk =
-    map(
-        (p_tr, mean_inf_period, red_sx_tr, red_sx_tr2, ch1) -> generate_R_gbmsm_over_time(
-            p_tr,
-            mean_inf_period,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-            4 * 7,
-        ),
-        prob_trans,
-        mean_inf_periods,
-        red_sx_trans,
-        red_sx_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-p_sx_trans_risks_12wk =
-    map(
-        (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
-            p_tr,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-            12 * 7,
-        ),
-        prob_trans,
-        red_sx_trans,
-        red_sx_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-R_gbmsm_12wk =
-    map(
-        (p_tr, mean_inf_period, red_sx_tr, red_sx_tr2, ch1) -> generate_R_gbmsm_over_time(
-            p_tr,
-            mean_inf_period,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-            12 * 7,
-        ),
-        prob_trans,
-        mean_inf_periods,
-        red_sx_trans,
-        red_sx_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-sx_trans_risk_cred_int = prev_cred_intervals(p_sx_trans_risks)
-sx_trans_risk_cred_int_4wk = prev_cred_intervals(p_sx_trans_risks_4wk)
-sx_trans_risk_cred_int_12wk = prev_cred_intervals(p_sx_trans_risks_12wk)
-R_gbmsms_cred_int_4wk = prev_cred_intervals(R_gbmsm_4wk)
-R_gbmsms_cred_int_12wk = prev_cred_intervals(R_gbmsm_12wk)
-
-
-dates = [Date(2021, 12, 31) + Day(t) for t in ts_risk]
+dates = [Date(2021, 12, 31) + Day(t) for t in ts_reversion]
 f = findfirst(dates .== Date(2022, 7, 23))
+f2 = findfirst(dates .== Date(2022, 9, 1))
+f3 = findfirst(dates .== wks[end-1])
 
-## Posterior probability of >10% decrease in risk
-
-p_sx_risk_pheic = mean([p_trans[f] < p_trans[1] * 0.9 for p_trans in p_sx_trans_risks])
-
-sx_cnt_trans_risk = DataFrame()
-sx_cnt_trans_risk[:, "Date"] = dates[dates.>=Date(2022, 5, 1)]
-
-R_gbmsm_df = DataFrame()
-R_gbmsm_df[:, "Date"] = dates[dates.>=Date(2022, 5, 1)]
-
-
-
-plt_chng = plot(
-    dates,
-    sx_trans_risk_cred_int_12wk.mean_pred,
-    ribbon = (
-        sx_trans_risk_cred_int_12wk.lb_pred_10,
-        sx_trans_risk_cred_int_12wk.ub_pred_10,
-    ),
-    lw = 3,
-    fillalpha = 0.2,
-    lab = "Transmission probability (12 week reversion)",
-    title = "Transmission probability (sexual contacts)",
-    ylabel = "Prob. per sexual contact",
-    xlims = (long_wks[1] - Day(7), long_wks[end] + Day(7)),
-    ylims = (0, 0.7),
-    xticks = (
-        [Date(2022, 5, 1) + Month(k) for k = 0:11],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
-    ),
-    color = :black,
-    left_margin = 5mm,
-    size = (800, 600),
-    dpi = 250,
-    tickfont = 13,
-    titlefont = 22,
-    guidefont = 18,
-    legendfont = 11,
-)
+# Posterior probability of >10% decrease in risk
+# p_sx_risk_pheic = mean([p_trans[f] < p_trans[1] * 0.9 for p_trans in p_sx_trans_risks])
 
 plt_R_gbmsm = plot(
-    dates,
-    R_gbmsms_cred_int_12wk.mean_pred,
-    ribbon = (R_gbmsms_cred_int_12wk.lb_pred_10, R_gbmsms_cred_int_12wk.ub_pred_10),
+    dates[1:f3],
+    creds_R0_gbmsm_no_rev.median_pred[1:f3],
+    ribbon = (creds_R0_gbmsm_no_rev.lb_pred_25[1:f3], creds_R0_gbmsm_no_rev.ub_pred_25[1:f3]),
     lw = 3,
     fillalpha = 0.2,
-    lab = "12 week reversion",
+    lab = "Fitted",
     title = "Reproductive number (GBMSM)",
     ylabel = "R₀(t) (GBMSM)",
     xlims = (long_wks[1] - Day(7), long_wks[end] + Day(7)),
@@ -683,7 +559,7 @@ plt_R_gbmsm = plot(
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
     ),
-    yticks = 1:10,
+    yticks = 0:10,
     color = :black,
     left_margin = 5mm,
     size = (800, 600),
@@ -694,90 +570,98 @@ plt_R_gbmsm = plot(
     legendfont = 11,
 )
 
+plot!(plt_R_gbmsm,
+        dates[1:f3],
+        creds_R0_gbmsm_no_rev.median_pred[1:f3],
+        ribbon = (creds_R0_gbmsm_no_rev.lb_pred_10[1:f3], creds_R0_gbmsm_no_rev.ub_pred_10[1:f3]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 0,
+        c = :black,
+        )
 
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. mean, no reversion)"] =
-    sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 10%, no reversion)"] =
-    sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 90%, no reversion)"] =
-    sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
+plot!(plt_R_gbmsm,
+        dates[1:f3],
+        creds_R0_gbmsm_no_rev.median_pred[1:f3],
+        ribbon = (creds_R0_gbmsm_no_rev.lb_pred_025[1:f3], creds_R0_gbmsm_no_rev.ub_pred_025[1:f3]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 0,
+        c = :black,
+        )
+ 
+plot!(plt_R_gbmsm,
+        dates[f2:end],
+        creds_R0_gbmsm_4wk.median_pred[f2:end],
+        ribbon = (creds_R0_gbmsm_4wk.lb_pred_25[f2:end], creds_R0_gbmsm_4wk.ub_pred_25[f2:end]),
+        fillalpha = 0.2,
+        lab = "4 weeks reversion",
+        lw = 3,
+        c = :red,
+        )
 
-plot!(
-    plt_chng,
-    dates[f:end],
-    sx_trans_risk_cred_int_4wk.mean_pred[f:end],
-    ribbon = (
-        sx_trans_risk_cred_int_4wk.lb_pred_10[f:end],
-        sx_trans_risk_cred_int_4wk.ub_pred_10[f:end],
-    ),
-    lw = 3,
-    fillalpha = 0.3,
-    lab = "Transmission probability (4 week reversion)",
-)
+plot!(plt_R_gbmsm,
+        dates[f2:end],
+        creds_R0_gbmsm_4wk.median_pred[f2:end],
+        ribbon = (creds_R0_gbmsm_4wk.lb_pred_10[f2:end], creds_R0_gbmsm_4wk.ub_pred_10[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :red,
+        )        
 
-plot!(
-    plt_R_gbmsm,
-    dates[f:end],
-    R_gbmsms_cred_int_4wk.mean_pred[f:end],
-    ribbon = (
-        R_gbmsms_cred_int_4wk.lb_pred_10[f:end],
-        R_gbmsms_cred_int_4wk.ub_pred_10[f:end],
-    ),
-    lw = 3,
-    fillalpha = 0.3,
-    lab = "4 week reversion",
-)
+plot!(plt_R_gbmsm,
+        dates[f2:end],
+        creds_R0_gbmsm_4wk.median_pred[f2:end],
+        ribbon = (creds_R0_gbmsm_4wk.lb_pred_025[f2:end], creds_R0_gbmsm_4wk.ub_pred_025[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :red,
+        )  
+
+plot!(plt_R_gbmsm,
+        dates[f2:end],
+        creds_R0_gbmsm_12wk.median_pred[f2:end],
+        ribbon = (creds_R0_gbmsm_12wk.lb_pred_25[f2:end], creds_R0_gbmsm_12wk.ub_pred_25[f2:end]),
+        fillalpha = 0.2,
+        lab = "12 week reversion",
+        lw = 3,
+        c = :blue,
+        )
+
+plot!(plt_R_gbmsm,
+        dates[f2:end],
+        creds_R0_gbmsm_12wk.median_pred[f2:end],
+        ribbon = (creds_R0_gbmsm_12wk.lb_pred_10[f2:end], creds_R0_gbmsm_12wk.ub_pred_10[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :blue,
+        )
 
 
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. mean, 4wk reversion)"] =
-    sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 10%, 4wk reversion)"] =
-    sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    sx_trans_risk_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 90%, 4wk reversion)"] =
-    sx_trans_risk_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    sx_trans_risk_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
+plot!(plt_R_gbmsm,
+        dates[f2:end],
+        creds_R0_gbmsm_12wk.median_pred[f2:end],
+        ribbon = (creds_R0_gbmsm_12wk.lb_pred_025[f2:end], creds_R0_gbmsm_12wk.ub_pred_025[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :blue,
+        )        
+        
+plot!(plt_R_gbmsm,
+        dates[210:end],
+        creds_R0_gbmsm_4wk.median_pred[210:end],
+        alpha = 0.75,
+        lab = "",
+        ls = :dash,
+        lw = 3,
+        c = :red,
+        )
 
-R_gbmsm_df[:, "R0 GBMSM (post. mean, 4wk reversion)"] =
-    R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 10%, 4wk reversion)"] =
-    R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    R_gbmsms_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 90%, 4wk reversion)"] =
-    R_gbmsms_cred_int_4wk.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    R_gbmsms_cred_int_4wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. mean, 12wk reversion)"] =
-    sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 10%, 12wk reversion)"] =
-    sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    sx_trans_risk_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-sx_cnt_trans_risk[:, "Risk trans. per sx cnt (post. 90%, 12wk reversion)"] =
-    sx_trans_risk_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    sx_trans_risk_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-
-R_gbmsm_df[:, "R0 GBMSM (post. mean, 12wk reversion)"] =
-    R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 10%, 12wk reversion)"] =
-    R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    R_gbmsms_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_gbmsm_df[:, "R0 GBMSM (post. 90%, 12wk reversion)"] =
-    R_gbmsms_cred_int_12wk.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    R_gbmsms_cred_int_12wk.lb_pred_10[dates.>=Date(2022, 5, 1)]
-
-vline!(
-    plt_chng,
-    [Date(2022, 7, 23)],
-    lw = 3,
-    color = :black,
-    ls = :dot,
-    lab = "",
-    annotation = (Date(2022, 7, 23) + Day(7), 0.5, "WHO declaration"),
-    annotationrotation = 270,
-)
-
+        
 vline!(
     plt_R_gbmsm,
     [Date(2022, 7, 23)],
@@ -787,99 +671,28 @@ vline!(
     lab = "",
     annotation = (Date(2022, 7, 23) + Day(7), 7.5, "WHO declaration"),
     annotationrotation = 270,
-)
-# annotate!(plt_chng,Date(2022, 7, 23),0.5, "WHO" )
-
-display(plt_R_gbmsm)
-
-CSV.write("projections/sx_cnt_risk" * string(wks[end]) * ".csv", sx_cnt_trans_risk)
-CSV.write("projections/R_gbmsm" * string(wks[end]) * ".csv", R_gbmsm_df)
+)     
 
 ##
-R0_other = [θ[5] for θ in param_draws]
-red_oth_trans = [θ[10] for θ in param_draws]
-chp1 = [θ[8] for θ in param_draws]
-red_oth_trans2 = [int.trans_red_other2 for int in interventions_ensemble]
+dates = [Date(2021, 12, 31) + Day(t) for t in ts_reversion]
+f = findfirst(dates .== Date(2022, 7, 23))
+f2 = findfirst(dates .== Date(2022, 9, 1))
+f3 = findfirst(dates .== wks[end-1])
 
 
-
-
-p_oth_trans_risks =
-    map(
-        (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
-            p_tr,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-        ),
-        R0_other,
-        red_oth_trans,
-        red_oth_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-p_oth_trans_risks_4wks =
-    map(
-        (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
-            p_tr,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-            4 * 7,
-        ),
-        R0_other,
-        red_oth_trans,
-        red_oth_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-p_oth_trans_risks_12wks =
-    map(
-        (p_tr, red_sx_tr, red_sx_tr2, ch1) -> generate_trans_risk_over_time(
-            p_tr,
-            red_sx_tr,
-            red_sx_tr2,
-            ch1,
-            chp_t2,
-            ts_risk,
-            12 * 7,
-        ),
-        R0_other,
-        red_oth_trans,
-        red_oth_trans2,
-        chp1,
-    ) .|> x -> reshape(x, length(x), 1)
-
-oth_sx_trans_risk_cred_int = prev_cred_intervals(p_oth_trans_risks)
-oth_sx_trans_risk_cred_int4wks = prev_cred_intervals(p_oth_trans_risks_4wks)
-oth_sx_trans_risk_cred_int12wks = prev_cred_intervals(p_oth_trans_risks_12wks)
-
-#Posterior probability of >10% decrease in risk
-# p_oth_risk_dec = mean([p_trans[f] < p_trans[1]*0.9 for p_trans in p_oth_trans_risks ])
-
-R_oth_risk = DataFrame()
-R_oth_risk[:, "Date"] = dates[dates.>=Date(2022, 5, 1)]
-
-
-
-plt_chng_oth = plot(
-    dates,
-    oth_sx_trans_risk_cred_int12wks.mean_pred,
+plt_R_ngbmsm = plot(
+    dates[1:f3],
+    creds_R0_ngbmsm_no_rev.median_pred[1:f3],
     ribbon = (
-        oth_sx_trans_risk_cred_int12wks.lb_pred_10,
-        oth_sx_trans_risk_cred_int12wks.ub_pred_10,
+        creds_R0_ngbmsm_no_rev.lb_pred_25[1:f3],
+        creds_R0_ngbmsm_no_rev.ub_pred_25[1:f3],
     ),
     lw = 3,
     fillalpha = 0.2,
-    lab = "R0, other contacts (12 week reversion)",
+    lab = "Fitted",
     title = "Reproductive number (other contacts)",
     ylabel = "R₀(t) (other contacts)",
     xlims = (long_wks[1] - Day(7), long_wks[end] + Day(7)),
-    ylims = (0, 0.3),
     xticks = (
         [Date(2022, 5, 1) + Month(k) for k = 0:11],
         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
@@ -895,84 +708,124 @@ plt_chng_oth = plot(
     legendfont = 11,
 )
 
-R_oth_risk[:, "R other (post. mean, no reversion)"] =
-    oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 10%, no reversion)"] =
-    oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    oth_sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 90%, no reversion)"] =
-    oth_sx_trans_risk_cred_int.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    oth_sx_trans_risk_cred_int.lb_pred_10[dates.>=Date(2022, 5, 1)]
+
+plot!(plt_R_ngbmsm,
+        dates[1:f3],
+        creds_R0_ngbmsm_no_rev.median_pred[1:f3],
+        ribbon = (creds_R0_ngbmsm_no_rev.lb_pred_10[1:f3], creds_R0_ngbmsm_no_rev.ub_pred_10[1:f3]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 0,
+        c = :black,
+        )
+
+plot!(plt_R_ngbmsm,
+        dates[1:f3],
+        creds_R0_ngbmsm_no_rev.median_pred[1:f3],
+        ribbon = (creds_R0_ngbmsm_no_rev.lb_pred_025[1:f3], creds_R0_ngbmsm_no_rev.ub_pred_025[1:f3]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 0,
+        c = :black,
+        )
+ 
+plot!(plt_R_ngbmsm,
+        dates[f2:end],
+        creds_R0_ngbmsm_4wk.median_pred[f2:end],
+        ribbon = (creds_R0_ngbmsm_4wk.lb_pred_25[f2:end], creds_R0_ngbmsm_4wk.ub_pred_25[f2:end]),
+        fillalpha = 0.2,
+        lab = "4 weeks reversion",
+        lw = 3,
+        c = :red,
+        )
+
+plot!(plt_R_ngbmsm,
+        dates[f2:end],
+        creds_R0_ngbmsm_4wk.median_pred[f2:end],
+        ribbon = (creds_R0_ngbmsm_4wk.lb_pred_10[f2:end], creds_R0_ngbmsm_4wk.ub_pred_10[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :red,
+        )        
+
+plot!(plt_R_ngbmsm,
+        dates[f2:end],
+        creds_R0_ngbmsm_4wk.median_pred[f2:end],
+        ribbon = (creds_R0_ngbmsm_4wk.lb_pred_025[f2:end], creds_R0_ngbmsm_4wk.ub_pred_025[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :red,
+        )  
+
+plot!(plt_R_ngbmsm,
+        dates[f2:end],
+        creds_R0_ngbmsm_12wk.median_pred[f2:end],
+        ribbon = (creds_R0_ngbmsm_12wk.lb_pred_25[f2:end], creds_R0_ngbmsm_12wk.ub_pred_25[f2:end]),
+        fillalpha = 0.2,
+        lab = "12 week reversion",
+        lw = 3,
+        c = :blue,
+        )
+
+plot!(plt_R_ngbmsm,
+        dates[f2:end],
+        creds_R0_ngbmsm_12wk.median_pred[f2:end],
+        ribbon = (creds_R0_ngbmsm_12wk.lb_pred_10[f2:end], creds_R0_ngbmsm_12wk.ub_pred_10[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :blue,
+        )
 
 
-plot!(
-    plt_chng_oth,
-    dates[f:end],
-    oth_sx_trans_risk_cred_int4wks.mean_pred[f:end],
-    ribbon = (
-        oth_sx_trans_risk_cred_int4wks.lb_pred_10[f:end],
-        oth_sx_trans_risk_cred_int4wks.ub_pred_10[f:end],
-    ),
-    lw = 3,
-    fillalpha = 0.3,
-    lab = "R0, other (4 week reversion)",
-)
+plot!(plt_R_ngbmsm,
+        dates[f2:end],
+        creds_R0_ngbmsm_12wk.median_pred[f2:end],
+        ribbon = (creds_R0_ngbmsm_12wk.lb_pred_025[f2:end], creds_R0_ngbmsm_12wk.ub_pred_025[f2:end]),
+        fillalpha = 0.2,
+        lab = "",
+        lw = 3,
+        c = :blue,
+        )        
+        
+plot!(plt_R_ngbmsm,
+        dates[210:end],
+        creds_R0_ngbmsm_4wk.median_pred[210:end],
+        alpha = 0.75,
+        lab = "",
+        ls = :dash,
+        lw = 3,
+        c = :red,
+        )
 
-R_oth_risk[:, "R other (post. mean, 4wk reversion)"] =
-    oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 10%, 4wk reversion)"] =
-    oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    oth_sx_trans_risk_cred_int4wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 90%, 4wk reversion)"] =
-    oth_sx_trans_risk_cred_int4wks.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    oth_sx_trans_risk_cred_int4wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
-
-
-# plot!(
-#     plt_chng_oth,
-#     dates[f:end],
-#     oth_sx_trans_risk_cred_int12wks.mean_pred[f:end],
-#     ribbon=(
-#         oth_sx_trans_risk_cred_int12wks.lb_pred_10[f:end],
-#         oth_sx_trans_risk_cred_int12wks.ub_pred_10[f:end],
-#     ),
-#     lw=3,
-#     fillalpha=0.3,
-#     color=:black,
-#     lab="R0, other (12 week reversion)",
-# )
-
-R_oth_risk[:, "R other (post. mean, 12wk reversion)"] =
-    oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 10%, 12wk reversion)"] =
-    oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)] .-
-    oth_sx_trans_risk_cred_int12wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
-R_oth_risk[:, "R other (post. 90%, 12wk reversion)"] =
-    oth_sx_trans_risk_cred_int12wks.mean_pred[dates.>=Date(2022, 5, 1)] .+
-    oth_sx_trans_risk_cred_int12wks.lb_pred_10[dates.>=Date(2022, 5, 1)]
-
-
-
+        
 vline!(
-    plt_chng_oth,
+    plt_R_ngbmsm,
     [Date(2022, 7, 23)],
     lw = 3,
     color = :black,
     ls = :dot,
     lab = "",
-    annotation = (Date(2022, 7, 23) + Day(7), 0.21, "WHO declaration"),
+    annotation = (Date(2022, 7, 23) + Day(7), 0.1, "WHO declaration"),
     annotationrotation = 270,
-)
+)     
 
-display(plt_chng_oth)
 
-CSV.write("projections/R_other" * string(wks[end]) * ".csv", R_oth_risk)
+
+
+##
+
+
+##
+
 
 ## Combined plot
 
 plt = plot(
     plt_R_gbmsm,
-    plt_chng_oth,
+    plt_R_ngbmsm,
     size = (1600, 800),
     dpi = 250,
     left_margin = 10mm,
@@ -984,66 +837,160 @@ display(plt)
 savefig(plt, "plots/risk_over_time" * string(wks[end]) * ".png")
 
 
-
-# plt = plot(
-#     plt_chng,
-#     plt_chng_oth,
-#     plt_prev,
-#     plt_prev_overall,
-#     size=(1750, 1600),
-#     dpi=250,
-#     left_margin=10mm,
-#     bottom_margin=10mm,
-#     right_margin=10mm,
-#     layout=(2, 2),
-# )
-# display(plt)
-# savefig(plt, "plots/change_and_prevalence" * string(wks[end]) * ".png")
-
-
 ##Cumulative infections
+# f1 = findfirst
 
-d1, d2 = size(mpxv_wkly)
+cum_mpxv_cases = cumsum(mpxv_wkly,dims = 1)[:]
 
-cuminf_cred_int = prev_cred_intervals([
-    cumsum(pred[2], dims = 1) for pred in preds_and_incidence_interventions
-])
-cuminf_cred_int_4wkrev = prev_cred_intervals([
-    cumsum(pred[2], dims = 1) for pred in preds_and_incidence_interventions_4wkrev
-])
-cuminf_cred_int_12wkrev = prev_cred_intervals([
-    cumsum(pred[2], dims = 1) for pred in preds_and_incidence_interventions_12wkrev
-])
+plt_cm_msm = plot(;
+    ylabel="Cumulative cases",
+    title="UK Monkeypox cumulative case projections (GBMSM)",
+    legend=:topleft,
+    xticks=(
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
+    ),
+    left_margin=5mm,
+    size=(800, 600),
+    dpi=250,
+    tickfont=15,
+    titlefont=16,
+    guidefont=24,
+    legendfont=11
+)
 
-cuminf_cred_int_cvac = prev_cred_intervals([
-    cumsum(pred[2], dims = 1) for pred in preds_and_incidence_interventions_cvac
-])
-cuminf_cred_int_cvac_4wkrev = prev_cred_intervals([
-    cumsum(pred[2], dims = 1) for pred in preds_and_incidence_interventions_cvac_4wkrev
-])
-cuminf_cred_int_cvac_12wkrev = prev_cred_intervals([
-    cumsum(pred[2], dims = 1) for pred in preds_and_incidence_interventions_cvac_12wkrev
-])
 
-cuminf_cred_int_overall = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims = 2), dims = 1) for
-    pred in preds_and_incidence_interventions
-])
-cuminf_cred_int_overall_4wkrev = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims = 2), dims = 1) for
-    pred in preds_and_incidence_interventions_4wkrev
-])
+plot!(
+    plt_cm_msm,
+    wks_reversion,
+    cum_mpxv_cases[d1-2,1] .+ cum_cred_int_4wk.median_pred[:, 1],
+    ribbon=(
+        cum_cred_int_4wk.lb_pred_25[:, 1],
+        cum_cred_int_4wk.ub_pred_25[:, 1],
+    ),
+    lw=3,
+    color=:red,
+    fillalpha=0.4,
+    lab="4 week reversion",
+)
 
-cuminf_cred_int_overall_12wkrev = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims = 2), dims = 1) for
-    pred in preds_and_incidence_interventions_12wkrev
-])
+plot!(
+    plt_cm_msm,
+    long_wks[((d1-2)):end],
+    cum_mpxv_cases[d1-2,1] .+ cum_cred_int_4wk.median_pred[:, 1],
+    ribbon=(
+        cum_cred_int_4wk.lb_pred_10[:, 1],
+        cum_cred_int_4wk.ub_pred_10[:, 1],
+    ),
+    lw=3,
+    color=:red,
+    fillalpha=0.4,
+    lab="",
+)
 
-cuminf_cred_int_overall_cvac_4wkrev = prev_cred_intervals([
-    cumsum(sum(pred[2][:, 1:10], dims = 2), dims = 1) for
-    pred in preds_and_incidence_interventions_cvac_4wkrev
-])
+plot!(
+    plt_cm_msm,
+    long_wks[((d1-2)):end],
+    cum_mpxv_cases[d1-2,1] .+ cum_cred_int_4wk.median_pred[:, 1],
+    ribbon=(
+        cum_cred_int_4wk.lb_pred_025[:, 1],
+        cum_cred_int_4wk.ub_pred_025[:, 1],
+    ),
+    lw=3,
+    color=:red,
+    fillalpha=0.4,
+    lab="",
+)
 
+
+# wks_no_vacs,
+#     cred_int_4wk_no_vacs.median_pred[:, 2],
+plot!(
+    plt_cm_msm,
+    long_wks[((d1-2)):end],
+    cum_mpxv_cases[d1-2,1] .+ cum_cred_int_4wk.median_pred[:, 1],
+    ribbon=(
+        cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 1],
+        cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 1],
+    ),
+    lw=3,
+    ls=:dash,
+    color=:black,
+    fillalpha=0.2,
+    fillstyle = :x,
+    lab="12 week reversion (no vaccines)",
+)
+
+gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1] .- cred_int_cum_incidence_cvac12wks.lb_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 12wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac12wks.mean_pred[:, 1] .+ cred_int_cum_incidence_cvac12wks.ub_pred_10[:, 1]
+
+
+
+plot!(
+    plt_cm_msm,
+    long_wks[((d1+1)):end],
+    total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1],
+    ribbon=(
+        cred_int_cum_incidence4wks.lb_pred_10[:, 1],
+        cred_int_cum_incidence4wks.ub_pred_10[:, 1],
+    ),
+    lw=3,
+    color=2,
+    fillalpha=0.4,
+    lab="4 week reversion",
+)
+
+gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1] .- cred_int_cum_incidence4wks.lb_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 4wk reversion)"] = total_cases[:, 1] .+ cred_int_cum_incidence4wks.mean_pred[:, 1] .+ cred_int_cum_incidence4wks.ub_pred_10[:, 1]
+
+
+plot!(
+    plt_cm_msm,
+    long_wks[((d1+1)):end],
+    total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1],
+    ribbon=(
+        cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 1],
+        cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 1],
+    ),
+    lw=3,
+    ls=:dash,
+    fillstyle = :x,
+    color=2,
+    fillalpha=0.3,
+    lab="4 week reversion (no vaccines)",
+)
+
+gbmsm_cum_case_projections[:, "Projected Cum. GBMSM cases (post. mean; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 10%; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1] .- cred_int_cum_incidence_cvac4wks.lb_pred_10[:, 1]
+gbmsm_cum_case_projections[:, "Projected GBMSM cases (post. 90%; 4wk reversion + no vacs)"] = total_cases[:, 1] .+ cred_int_cum_incidence_cvac4wks.mean_pred[:, 1] .+ cred_int_cum_incidence_cvac4wks.ub_pred_10[:, 1]
+
+plot!(
+    plt_cm_msm,
+    long_wks,
+    cred_int_cum_cases_unmitigated.mean_pred[:, 1],
+    ribbon=(
+        cred_int_cum_cases_unmitigated.lb_pred_10[:, 1],
+        cred_int_cum_cases_unmitigated.ub_pred_10[:, 1],
+    ),
+    lw=3,
+    ls=:dash,
+    color= :green,
+    fillalpha=0.2,
+    fillstyle = :x,
+    lab="Unmitigated",
+)
+
+
+scatter!(
+    plt_cm_msm,
+    wks,
+    cumsum(mpxv_wkly[:, 1], dims=1),
+    lab="Data",
+    ms=6,
+    color=:black,
+)
 
 ##
 
@@ -1134,7 +1081,7 @@ CSV.write("projections/population_exposure_" * string(date_exposure) * ".csv", e
 layout = @layout [a b; c d]
 fig1 = plot(
     plt_R_gbmsm,
-    plt_chng_oth,
+    plt_R_ngbmsm,
     plt_msm,
     plt_nmsm,
     # plt_prop,
@@ -1157,7 +1104,7 @@ fig2 = plot(
     plt_prop,
     plt_cm_msm,
     plt_cm_nmsm,
-    size = (1750, 1600),
+    a = (1750, 1600),
     dpi = 250,
     left_margin = 10mm,
     bottom_margin = 10mm,
