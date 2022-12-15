@@ -133,6 +133,8 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     #Get parameters and make parameter transformations transformations
     α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+
+
     vac_effectiveness = rand(Uniform(0.7,0.85))
     κ = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
     # trans_red2 = scale_trans_red2
