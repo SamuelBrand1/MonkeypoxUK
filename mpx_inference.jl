@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit5"
+colname = "seqn_fit1"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -38,9 +38,9 @@ prior_vect_cng_pnt = [
     Gamma(3, 1000 / 3),#  M 5
     LogNormal(log(5), 1),#init_scale 6
     Uniform(135, 199),# chp_t 7
-    Beta(1.5, 1.5),#trans_red 8
+    Uniform(0.0,1e-10),#trans_red 8
     Uniform(0.0,1e-10),#trans_red_other 9
-    Beta(1.5, 1.5),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red WHO  10 
     Uniform(0.0,1e-10),#trans_red_other WHO 11
 ]
 
@@ -72,8 +72,8 @@ setup_cng_pnt = ABCSMC(
 ##Run ABC and save results   
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
-description_str = "no_ngbmsm_chg"
-@save("posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * "_noR_ngbmsm.jld2", smc_cng_pnt) #<--- this can be too large
+description_str = "no_bv_cng"
+@save("posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * ".jld2", smc_cng_pnt) #<--- this can be too large
 ##
 
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
