@@ -232,8 +232,8 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
     N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
 
     #Get parameters and make parameter transformations transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2, α_choose_nb, p_detect_nb, p_trans_nb, R0_other_nb, init_scale_nb, mdl_choice = params
-
+    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2, α_choose_nb, p_detect_nb, p_trans_nb, R0_other_nb, init_scale_nb, prob_mdl_choice = params
+    mdl_choice = rand(Bernoulli(prob_mdl_choice)) 
     #Choose model, if true then its the no behaviour change model
     if mdl_choice
         α_choose = α_choose_nb
@@ -330,7 +330,7 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, (;detected_cases, onsets, incidence, susceptibility, vac_effectiveness, state_pre_vaccine, state_sept, end_state)
+    return L1_rel_err, (;detected_cases, onsets, incidence, susceptibility, vac_effectiveness, state_pre_vaccine, state_sept, end_state, mdl_choice)
 end
 
 

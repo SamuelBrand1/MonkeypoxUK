@@ -47,7 +47,7 @@ prior_vect_cng_pnt = [
     Beta(1, 1), #p_trans no behaviour change   14  
     LogNormal(log(0.25), 1), #R0_other no behaviour change   15
     LogNormal(log(5), 1),#init_scale no behaviour change   16
-    Bernoulli(0.5) # model choice boolean, true == model with no behavioural change 17
+    Uniform(0.0,1.0) # model choice boolean, true == model with no behavioural change 17
 ]
 
 
@@ -64,7 +64,7 @@ prior_vect_cng_pnt = [
 setup_mdl_select = ABCSMC(
     MonkeypoxUK.mpx_sim_function_mdl_selection, #simulation function
     length(prior_vect_cng_pnt), # number of parameters
-    0.25, #target ϵ derived from simulation based calibration
+    0.2, #target ϵ derived from simulation based calibration
     Prior(prior_vect_cng_pnt); #Prior for each of the parameters
     ϵ1 = 1000,
     convergence = 0.05,
@@ -72,12 +72,12 @@ setup_mdl_select = ABCSMC(
     α = 0.3,
     kernel = gaussiankernel,
     constants = constants,
-    maxiterations = 5 * 10^5,
+    maxiterations = 10 * 10^5,
 )
 
 ##Run ABC and save results   
 
-smc_mdl_select = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
+smc_mdl_select = runabc(setup_mdl_select, mpxv_wkly, verbose = true, progress = true)
 @save("posteriors/smc_mdl_select_" * string(wks[end]) * ".jld2", smc_mdl_select) #<--- this can be too large
 ##
 
