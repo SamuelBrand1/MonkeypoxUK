@@ -1,9 +1,11 @@
 using Distributions, StatsBase, StatsPlots
 using Plots.PlotMeasures, CSV, DataFrames
 using LinearAlgebra, RecursiveArrayTools, Dates
+using ProgressMeter
 using OrdinaryDiffEq, ApproxBayes, MCMCChains
 using JLD2
 using MonkeypoxUK
+
 
 ## MSM data with data inference
 
@@ -49,9 +51,9 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 
 ## Load posterior draws and saved trajectiories
 
-date_str = "2022-06-20"
+date_str = "2022-09-26"
 # description_str = "no_bv_cng"
-description_str = ""
+description_str = "no_ngbmsm_chg"
 
 param_draws = load("posteriors/posterior_param_draws_" * date_str * description_str * ".jld2")["param_draws"]
 detected_cases = load("posteriors/posterior_detected_cases_" * date_str * description_str * ".jld2")["detected_cases"]
@@ -122,7 +124,7 @@ f_rev = findfirst(wks .> Date(2022,9,1))
 f_novac = findfirst(wks .== Date(2022,7,25))
 
 wks_proj_fromend = [wks[end] + Day(7k) for k = 1:n_wks_lookahead]
-wks_proj_fromend = [wks[8] + Day(7k) for k = 1:n_wks_lookahead]
+# wks_proj_fromend = [wks[8] + Day(7k) for k = 1:n_wks_lookahead]
 wks_reversion = [wks[f_rev] + Day(7k) for k = 1:n_lookaheadweeks + 3]
 wks_no_vacs = [wks[f_novac] + Day(7k) for k = 1:n_lookaheadweeks + 9]
 
@@ -144,27 +146,27 @@ proj_no_vaccines = [(ts = wks_no_vacs .|> d -> (d - Date(2021,12,31)).value |> F
                         wkly_vaccinations = zeros(100),
                         vac_effectiveness = vac_effs[k]) for k = 1:n_samples]
 
-projections_from_end = map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state),
+projections_from_end = @showprogress 0.1 "MPX Forecasts:" map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state),
                     param_draws,
                     proj_fromend,
                     end_states)  
 
-projections_reversions_4wk_rev = map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 4),
+projections_reversions_4wk_rev = @showprogress 0.1 "MPX 4 week reversion:" map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 4),
                     param_draws,
                     proj_reversion,
                     sept_states)                      
 
-projections_reversions_12wk_rev = map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 12),
+projections_reversions_12wk_rev = @showprogress 0.1 "MPX 12 week reversion:" map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 12),
                     param_draws,
                     proj_reversion,
                     sept_states)    
 
-projections_reversions_4wk_rev_no_vac = map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 4),
+projections_reversions_4wk_rev_no_vac = @showprogress 0.1 "MPX 4 week reversion (no vaccines):" map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 4),
                     param_draws,
                     proj_no_vaccines,
                     no_vac_states)                      
 
-projections_reversions_12wk_rev_no_vac = map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 12),
+projections_reversions_12wk_rev_no_vac = @showprogress 0.1 "MPX 12 week reversion (no vaccines):" map((θ, interventions, state) ->  mpx_sim_function_projections(θ, constants, interventions, state, 12),
                     param_draws,
                     proj_no_vaccines,
                     no_vac_states)                        
@@ -243,11 +245,11 @@ plot!(
     lab = "",
 )
 
-plot!(plt_msm,
-        wks_proj_fromend,
-        cred_proj.median_pred[:,1],
-        ribbon = (cred_proj.lb_pred_025[:, 1], cred_proj.ub_pred_025[:, 1]),
-        lab = "bev. change")
+# plot!(plt_msm,
+#         wks_proj_fromend,
+#         cred_proj.median_pred[:,1],
+#         ribbon = (cred_proj.lb_pred_025[:, 1], cred_proj.ub_pred_025[:, 1]),
+#         lab = "bev. change")
 
 plot!(
     plt_msm,

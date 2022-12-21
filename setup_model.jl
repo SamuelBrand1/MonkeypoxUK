@@ -53,10 +53,10 @@ bar!(
     color = :green,
     xlabel = "Incubation period (days)",
     ylabel = "Probability",
-    inset = bbox(0.65, 0.15, 0.275, 0.3, :top, :left),
+    inset = bbox(0.65, 0.25, 0.275, 0.3, :top, :left),
     subplot = 2,
     grid = nothing,
-    title = "Best fit incubation distribution",
+    title = "",
     yguidefont = 15
 )
 
@@ -64,17 +64,17 @@ bar!(
 
 daily_incubation_prob = [cdf(d_incubation,t) - cdf(d_incubation,t-1) for t = 1:length(prob_bstfit)]
 
-plot!(
-    plt_incfit,
-    daily_incubation_prob,
-    lab="Distribution",
-    subplot = 2,
-    lw = 3
-)
+# plot!(
+#     plt_incfit,
+#     daily_incubation_prob,
+#     lab="",
+#     subplot = 2,
+#     lw = 3
+# )
 
 
 display(plt_incfit)
-# savefig(plt_incfit, "plots/incubation_fit.png")
+savefig(plt_incfit, "plots/incubation_fit_revised.png")
 ## Next generation calculations
 
 function next_state_mat(p_inf)
