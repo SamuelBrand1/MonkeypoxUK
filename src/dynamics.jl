@@ -137,8 +137,6 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     vac_effectiveness = rand(Uniform(0.7,0.85))
     κ = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
-    # trans_red2 = scale_trans_red2
-    # trans_red_other2 = scale_red_other2
 
     #Generate random population structure
     u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_cliques=n_cliques)
