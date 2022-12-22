@@ -332,70 +332,62 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
 end
 
 
-
-
 """
-    function mpx_sim_function_interventions(params, constants, wkly_cases, interventions)
+    function mpx_sim_function_projections(params, constants, interventions, init_condition)
 
-Forecasting/scenario projection simulation function. Compared to main simulation function `mpx_sim_function_chp`, this takes in a richer 
-    set of interventions, encoded in an `interventions` object. Outputs a richer set of observables.       
+Project forwards from an initial state `init_condition`, with model parameters `params` and vaccine deployment defined by the `NamedTuple` object `interventions`. This model assumes
+not reversion in behavioural risk of transmission.        
 """
-function mpx_sim_function_interventions(params, constants, wkly_cases, interventions)
+function mpx_sim_function_projections(params, constants, interventions, init_condition)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
 
-    #Get intervention data
-    chp_t2 = interventions.chp_t2
+    # #Get intervention data
+    ts = interventions.ts
     wkly_vaccinations = interventions.wkly_vaccinations
-    trans_red2 = interventions.trans_red2
-    inf_duration_red = interventions.inf_duration_red
     vac_effectiveness = interventions.vac_effectiveness
-    trans_red_other2 = interventions.trans_red_other2
 
-    #Get parameters and make transformations
-    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
-    p_γ = 1 / (1 + mean_inf_period)
-    γ_eff = -log(1 - p_γ) #get recovery rate
+    # #Get parameters and make transformations
+    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    weeks_to_project = length(ts)
+    ts_0 = ts[1]
+    κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
-    #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
-    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+    # # Generate transmission matrices based on the inital state
+    N_clique = sum(init_condition.x[1], dims = [1,2])[:]
+    N_grp_msm = sum(init_condition.x[1], dims = 1)[1, :, :]
+    Λ, B = MonkeypoxUK.setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
-    #Simulate and track error
-    L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[1:end-1, :])
-    u_mpx = ArrayPartition(u0_msm, u0_other)
-    prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-        u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
-        [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
+    #Project forwards
+
+    _p = copy([p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
+    prob = DiscreteProblem((du, u, p, t) -> MonkeypoxUK.f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon),
+                        init_condition, 
+                        (ts_0, ts_0 + 7 * weeks_to_project),
+                        _p)
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
-    old_onsets = [0, 0]
-    new_onsets = [0, 0]
-    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
-    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+
+    # #Set up arrays for tracking epidemiological observables
+    
+    old_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
+    new_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
+    old_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
+    new_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
     wk_num = 1
-    detected_cases = zeros(size(wkly_cases))
-    incidence = zeros(Int64, size(wkly_cases, 1), 11)
-    prevalence = zeros(Int64, size(wkly_cases, 1), 11)
-    not_changed = true
-    not_changed2 = true
+    detected_cases = zeros(weeks_to_project, 2)
+    incidence = zeros(Int64, weeks_to_project, 11)
+    
 
-
-    while wk_num <= size(wkly_cases, 1) #Step forward a week
-        #Change points
-        if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
-            not_changed = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce non-sexual transmission after the change point
+    # #Step through the dynamics
+    while wk_num <= weeks_to_project #Step forward a week
+        
+        for day = 1:7
+            #Calculate effective transmission rates for each day of transmission
+            mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) * (1 - trans_red2)
+            mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+            
+            step!(mpx_init, 1)
         end
-
-        if not_changed2 && mpx_init.t > chp_t2 ##2nd change point for transmission 
-            not_changed2 = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
-        end
-        #Step forward a week in time
-        step!(mpx_init, 7)
 
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
@@ -403,7 +395,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
         num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
-        du_vac.x[1][8, 3:end, :] .+= num_vaccines
+        du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
@@ -412,96 +404,81 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= Float64.(actual_obs)
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
-        end
-        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][2:4, n, :]) for n = 1:10]; sum(mpx_init.u.x[2][2:4])]
-
+        
         #Move time forwards one week
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
     end
 
-    return L1_rel_err, detected_cases, incidence, prevalence, mpx_init.u
+    return (;detected_cases, incidence)
 end
 
 """
-    function mpx_sim_function_interventions(params, constants, wkly_cases, interventions, weeks_to_reversion)
+    function mpx_sim_function_projections(params, constants, interventions, init_condition, weeks_to_reversion)
 
-Forecasting/scenario projection simulation function. Compared to main simulation function `mpx_sim_function_chp`, this takes in a richer 
-    set of interventions, encoded in an `interventions` object. Outputs a richer set of observables. The number of weeks to revert probability of transmission
-    to its initial estimate is given by `weeks_to_reversion`.     
+Project forwards from an initial state `init_condition`, with model parameters `params` and vaccine deployment defined by the `NamedTuple` object `interventions`. This model assumes
+that there is reversion in behavioural risk of transmission starting in the first week of September which occurs over `weeks_to_reversion` weeks.        
 """
-function mpx_sim_function_interventions(params, constants, wkly_cases, interventions, weeks_to_reversion)
+function mpx_sim_function_projections(params, constants, interventions, init_condition, weeks_to_reversion)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, n_cliques = constants
+    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
 
-    #Get intervention data
-    chp_t2 = interventions.chp_t2
+    # #Get intervention data
+    ts = interventions.ts
     wkly_vaccinations = interventions.wkly_vaccinations
-    trans_red2 = interventions.trans_red2
-    inf_duration_red = interventions.inf_duration_red
     vac_effectiveness = interventions.vac_effectiveness
-    trans_red_other2 = interventions.trans_red_other2
 
-    #Get parameters and make transformations
-    α_choose, p_detect, mean_inf_period, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other = params
+    # #Get parameters and make transformations
+    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    weeks_to_project = length(ts)
+    ts_0 = ts[1]
+    κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
-    p_γ = 1 / (1 + mean_inf_period)
-    γ_eff = -log(1 - p_γ) #get recovery rate
-    
-    #Calculate logistic reversion to pre-change
+    # Calculate logistic reversion to pre-change
     p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
     R_oth_min = R0_other*(1 - trans_red_other)*(1 - trans_red_other2)
     T₅₀ = (Date(2022,9,1) - Date(2021,12,31)).value + (weeks_to_reversion * 7 / 2) # 50% return to normal point
-    κ = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
+    κ_rev = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
-    #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_states=9, n_cliques=n_cliques)
-    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+    # # Generate transmission matrices based on the inital state
+    N_clique = sum(init_condition.x[1], dims = [1,2])[:]
+    N_grp_msm = sum(init_condition.x[1], dims = 1)[1, :, :]
+    Λ, B = MonkeypoxUK.setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
 
-    #Simulate and track error
-    L1_rel_err = 0.0
-    total_cases = sum(wkly_cases[1:end-1, :])
-    u_mpx = ArrayPartition(u0_msm, u0_other)
+    #Project forwards
+
     _p = copy([p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
-    prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total),
-        u_mpx, (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)),#lag for week before detection
-        _p)
+    prob = DiscreteProblem((du, u, p, t) -> MonkeypoxUK.f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon),
+                        init_condition, 
+                        (ts_0, ts_0 + 7 * weeks_to_project),
+                        _p)
     mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
 
-    #Set up arrays for tracking epidemiological observables
-    old_onsets = [0, 0]
-    new_onsets = [0, 0]
-    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
-    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    # #Set up arrays for tracking epidemiological observables
+    
+    old_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
+    new_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
+    old_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
+    new_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
     wk_num = 1
-    detected_cases = zeros(size(wkly_cases))
-    incidence = zeros(Int64, size(wkly_cases, 1), 11)
-    prevalence = zeros(Int64, size(wkly_cases, 1), 11)
-    not_changed = true
-    not_changed2 = true
+    detected_cases = zeros(weeks_to_project, 2)
+    incidence = zeros(Int64, weeks_to_project, 11)
+    
 
-    #Step through the dynamics
-    while wk_num <= size(wkly_cases, 1) #Step forward a week
-        #Change points
-        if not_changed && mpx_init.t > chp_t ##1st change point for transmission prob
-            not_changed = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red) #Reduce transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other) #Reduce non-sexual transmission after the change point
-        end
-        if not_changed2 && mpx_init.t > chp_t2 ##2nd change point for transmission 
-            not_changed2 = false
-            mpx_init.p[1] = mpx_init.p[1] * (1 - trans_red2) #Reduce sexual MSM transmission after the change point
-            mpx_init.p[2] = mpx_init.p[2] * (1 - trans_red_other2) #Reduce  other transmission after the change point
-        end
-        #Step forward a week in time and implement reversion to normal transmission
-
-        for stp = 1:7
+    # #Step through the dynamics
+    while wk_num <= weeks_to_project #Step forward a week
+        
+        for day = 1:7
+            #Calculate effective transmission rates for each day of transmission
+            if mpx_init.t < (Date(2022,9,1) - Date(2021,12,31)).value
+                mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) * (1 - trans_red2)
+                mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+            else
+                mpx_init.p[1] = p_min + (p_trans - p_min) * sigmoid((mpx_init.t - T₅₀)/κ_rev)
+                mpx_init.p[2] = R_oth_min + (R0_other - R_oth_min) * sigmoid((mpx_init.t - T₅₀)/κ_rev)
+            end
             step!(mpx_init, 1)
-            mpx_init.p[1] += (p_trans - p_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
-            mpx_init.p[2] += (R0_other - R_oth_min)*(sigmoid((mpx_init.t - T₅₀)/κ) - sigmoid((mpx_init.t - 1.0 - T₅₀)/κ))
         end
 
         #Do vaccine uptake
@@ -510,7 +487,7 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
         num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
-        du_vac.x[1][8, 3:end, :] .+= num_vaccines
+        du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
@@ -519,16 +496,109 @@ function mpx_sim_function_interventions(params, constants, wkly_cases, intervent
         actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
         detected_cases[wk_num, :] .= Float64.(actual_obs)
         incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        if wk_num < size(wkly_cases, 1) # Only compare on weeks 1 --- (end-1)
-            L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases
-        end
-        prevalence[wk_num, :] .= [[sum(mpx_init.u.x[1][2:6, n, :]) for n = 1:10]; sum(mpx_init.u.x[2][2:6])]
-
+        
         #Move time forwards one week
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
     end
 
-    return L1_rel_err, detected_cases, incidence, prevalence
+    return (;detected_cases, incidence)
 end
+
+
+"""
+    function reproductive_ratios(
+        params,
+        constants,
+        interventions,
+        weeks_to_reversion;
+        av_cnt_rate=mean(mean_daily_cnts),
+        reversion_time=(Date(2022, 9, 1) - Date(2021, 12, 31)).value
+    )
+
+Calculate the R₀ and (instaneous) R_t for GBMSM and non-GBMSM, with a 1% -> 99% reversion to normal occuring over `days_reversion`.
+"""
+function reproductive_ratios(
+    params,
+    constants,
+    weeks_to_reversion,
+    ts;
+    av_cnt_rate = 1.978375735058361,
+    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value
+)
+    #Get constant data
+    N_total, N_msm, ps, ms, ingroup, ___, α_incubation, γ_eff, epsilon, n_cliques, _, __, chp_t2, weeks_to_change = constants
+
+    # #Get parameters and make transformations
+    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
+    mean_inf_period = (epsilon / (1 - exp(-α_incubation))) + (1 / (1 - exp(-γ_eff)))
+
+    # Calculate logistic reversion to pre-change
+    p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
+    R_oth_min = R0_other*(1 - trans_red_other)*(1 - trans_red_other2)
+    T₅₀ = reversion_time + (weeks_to_reversion * 7 / 2) # 50% return to normal point
+    κ_rev = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
+
+    # Calculate 
+    R₀_gbmsm = Vector{Float64}(undef, length(ts))
+    R₀_ngbmsm = Vector{Float64}(undef, length(ts))
+
+    for (i, t) in enumerate(ts)
+        if t < reversion_time
+            R₀_gbmsm[i] = t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) * (1 - trans_red2)
+            R₀_ngbmsm[i] = t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+            R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
+        else
+            R₀_gbmsm[i] = p_min + (p_trans - p_min) * sigmoid((t - T₅₀)/κ_rev)
+            R₀_ngbmsm[i] = R_oth_min + (R0_other - R_oth_min) * sigmoid((t - T₅₀)/κ_rev)
+            R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
+        end
+    end
+
+    return (;R₀_gbmsm, R₀_ngbmsm)
+end
+
+
+"""
+    function reproductive_ratios(
+        params,
+        constants,
+        interventions,
+        weeks_to_reversion;
+        av_cnt_rate=mean(mean_daily_cnts),
+        reversion_time=(Date(2022, 9, 1) - Date(2021, 12, 31)).value
+    )
+
+Calculate the R₀ and (instaneous) R_t for GBMSM and non-GBMSM, with a 1% -> 99% reversion to normal occuring over `days_reversion`.
+"""
+function reproductive_ratios(
+    params,
+    constants,
+    ts;
+    av_cnt_rate = 1.978375735058361,
+    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value
+)
+    #Get constant data
+    N_total, N_msm, ps, ms, ingroup, ___, α_incubation, γ_eff, epsilon, n_cliques, _, __, chp_t2, weeks_to_change = constants
+
+    # #Get parameters and make transformations
+    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
+    mean_inf_period = (epsilon / (1 - exp(-α_incubation))) + (1 / (1 - exp(-γ_eff)))
+
+
+    # Calculate 
+    R₀_gbmsm = Vector{Float64}(undef, length(ts))
+    R₀_ngbmsm = Vector{Float64}(undef, length(ts))
+
+    for (i, t) in enumerate(ts)
+        R₀_gbmsm[i] = t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) * (1 - trans_red2)
+        R₀_ngbmsm[i] = t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+        R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
+    end
+
+    return (;R₀_gbmsm, R₀_ngbmsm)
+end
+

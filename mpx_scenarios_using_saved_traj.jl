@@ -6,7 +6,6 @@ using OrdinaryDiffEq, ApproxBayes, MCMCChains
 using JLD2
 using MonkeypoxUK
 
-
 ## MSM data with data inference
 
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
@@ -54,6 +53,7 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 date_str = "2022-09-26"
 # description_str = "no_bv_cng"
 description_str = "no_ngbmsm_chg"
+# description_str = ""
 
 param_draws = load("posteriors/posterior_param_draws_" * date_str * description_str * ".jld2")["param_draws"]
 detected_cases = load("posteriors/posterior_detected_cases_" * date_str * description_str * ".jld2")["detected_cases"]
@@ -62,6 +62,12 @@ no_vac_states = load("posteriors/posterior_begin_vac_states_" * date_str * descr
 sept_states = load("posteriors/posterior_begin_sept_states_" * date_str * description_str * ".jld2")["begin_sept_states"]
 end_states = load("posteriors/posterior_end_states_" * date_str * description_str * ".jld2")["end_states"]
 incidences = load("posteriors/posterior_incidences_" * date_str * description_str * ".jld2")["incidences"]
+
+##
+
+param_draws = [θ[1:end] |> x -> vcat(x,0.0) for θ in param_draws]
+
+
 ## Public health emergency effect forecasts
 
 n_lookaheadweeks = 26
@@ -114,7 +120,7 @@ vaccine_projections = DataFrame(
 CSV.write("projections/vaccine_rollout.csv", vaccine_projections)
 
 ##
-include("mpx_projections_dev.jl")
+# include("mpx_projections_dev.jl")
 ## Define counterfactuals and projections
 
 d1, d2 = size(mpxv_wkly)
