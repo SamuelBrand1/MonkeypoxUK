@@ -39,8 +39,9 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26.jld2")
-param_draws = load("posteriors/posterior_param_draws_2022-09-26.jld2")["param_draws"]
+smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26no_ngbmsm_chg.jld2")
+# param_draws = load("posteriors/posterior_param_draws_2022-09-26_noR_ngbmsm.jld2")["param_draws"]
+param_draws = [particle.params for particle in smc.particles]
 
 ## Create size distribution plot for the meta population sizes
 n_metapop = 50

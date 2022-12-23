@@ -53,6 +53,8 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 date_str = "2022-09-26"
 # description_str = "no_bv_cng"
 description_str = "no_ngbmsm_chg"
+# description_str = "one_metapop"
+
 # description_str = ""
 
 param_draws = load("posteriors/posterior_param_draws_" * date_str * description_str * ".jld2")["param_draws"]
@@ -65,7 +67,7 @@ incidences = load("posteriors/posterior_incidences_" * date_str * description_st
 
 ##
 
-param_draws = [θ[1:end] |> x -> vcat(x,0.0) for θ in param_draws]
+# param_draws = [θ[1:end] |> x -> vcat(x,0.0) for θ in param_draws]
 
 
 ## Public health emergency effect forecasts
@@ -929,6 +931,7 @@ plot!(
     lw=3,
     ls = :dash,
     color=:red,
+    fillstyle = :x,
     fillalpha=0.2,
     lab="4 week reversion (no vaccines)",
 )
@@ -987,6 +990,7 @@ plot!(
     ls = :dash,
     color=:blue,
     fillalpha=0.2,
+    fillstyle = :x,
     lab="12 week reversion (no vaccines)",
 )
 
@@ -1073,6 +1077,7 @@ plot!(
     lw=3,
     ls = :dash,
     color=:red,
+    fillstyle = :x,
     fillalpha=0.2,
     lab="4 week reversion (no vaccines)",
 )
@@ -1130,6 +1135,7 @@ plot!(
     lw=3,
     ls = :dash,
     color=:blue,
+    fillstyle = :x,
     fillalpha=0.2,
     lab="12 week reversion (no vaccines)",
 )
@@ -1228,10 +1234,10 @@ display(plt_prop)
 
 ## Main figure 1
 
-layout = @layout [a b; c d]
+layout = @layout [a; b c]
 fig1 = plot(
     plt_R_gbmsm,
-    plt_R_ngbmsm,
+    # plt_R_ngbmsm,
     plt_msm,
     plt_nmsm,
     # plt_prop,
@@ -1264,8 +1270,8 @@ fig2 = plot(
 )
 
 display(fig2)
-savefig(fig2, "plots/main_figure2_" * string(wks[end]) * ".png")
-savefig(fig2, "plots/main_figure2_" * string(wks[end]) * ".svg")
+savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".png")
+savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".svg")
 
 
 ## Plot uncontrolled epidemic

@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit5"
+colname = "seqn_fit4"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -31,7 +31,7 @@ include("setup_model.jl");
 ## Define priors for the parameters
 
 prior_vect_cng_pnt = [
-    Uniform(1e-6,1e-5), # α_choose 1
+    Gamma(1,1), # α_choose 1
     Beta(5, 5), #p_detect  2
     Beta(1, 1), #p_trans  3
     LogNormal(log(0.25), 1), #R0_other 4
@@ -40,8 +40,8 @@ prior_vect_cng_pnt = [
     Uniform(135, 199),# chp_t 7
     Beta(1.5,1.5),#trans_red 8
     Beta(1.5,1.5),#trans_red_other 9
-    Beta(1.5,1.5),#trans_red WHO  10 
-    Beta(1.5,1.5),#trans_red_other WHO 11
+    Uniform(0.0,1e-10),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red_other WHO 11
 ]
 
 
@@ -72,7 +72,7 @@ setup_cng_pnt = ABCSMC(
 ##Run ABC and save results   
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
-description_str = "one_metapop"
+description_str = "no_ngbmsm_chg"
 @save("posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * ".jld2", smc_cng_pnt) #<--- this can be too large
 
 ##
