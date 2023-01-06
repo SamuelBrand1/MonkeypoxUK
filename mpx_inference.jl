@@ -39,9 +39,9 @@ prior_vect_cng_pnt = [
     Gamma(3, 1000 / 3),#  M 5
     LogNormal(log(5), 1),#init_scale 6
     Uniform(135, 199),# chp_t 7
-    Uniform(0.0, 1e-10),#trans_red 8
+    Beta(1.5, 1.5),#trans_red 8
     Uniform(0.0, 1e-10),#trans_red_other 9
-    Uniform(0.0, 1e-10),#trans_red WHO  10 
+    Beta(1.5, 1.5),#trans_red WHO  10 
     Uniform(0.0, 1e-10),#trans_red_other WHO 11
 ]
 
@@ -73,9 +73,9 @@ setup_cng_pnt = ABCSMC(
 ##Run ABC and save results   
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
-# description_str = "no_ngbmsm_chg"
+description_str = "no_ngbmsm_chg"
 # description_str = "no_bv_chg"
-description_str = "one_metapop"
+# description_str = "one_metapop"
 @save(
     "posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * ".jld2",
     smc_cng_pnt
