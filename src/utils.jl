@@ -11,64 +11,180 @@ represent sampled weekly incidence of MSM and non-MSM people. Output a `NamedTup
 function cred_intervals(preds; central_est = :mean)
     @assert (central_est == :mean || central_est == :median) "Central estimate choice must be mean or median."
 
-    mean_pred = hcat([mean([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
-        [mean([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
-    median_pred = hcat([median([preds[n][wk, 1] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)],
-        [median([preds[n][wk, 2] for n = 1:length(preds)]) for wk in 1:size(preds[1], 1)])
+    mean_pred = hcat(
+        [mean([preds[n][wk, 1] for n = 1:length(preds)]) for wk = 1:size(preds[1], 1)],
+        [mean([preds[n][wk, 2] for n = 1:length(preds)]) for wk = 1:size(preds[1], 1)],
+    )
+    median_pred = hcat(
+        [median([preds[n][wk, 1] for n = 1:length(preds)]) for wk = 1:size(preds[1], 1)],
+        [median([preds[n][wk, 2] for n = 1:length(preds)]) for wk = 1:size(preds[1], 1)],
+    )
 
     if central_est == :mean
-        lb_pred_25 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)])
+        lb_pred_25 =
+            mean_pred .- hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            )
 
-        lb_pred_10 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.10) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.10) for wk in 1:size(preds[1], 1)])
+        lb_pred_10 =
+            mean_pred .- hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.10) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.10) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            )
 
-        lb_pred_025 = mean_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)])
+        lb_pred_025 =
+            mean_pred .- hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            )
 
-        ub_pred_25 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- mean_pred
+        ub_pred_25 =
+            hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            ) .- mean_pred
 
-        ub_pred_10 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.9) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.9) for wk in 1:size(preds[1], 1)]) .- mean_pred   
-            
-        ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- mean_pred
-        return (mean_pred=mean_pred, 
-                median_pred=median_pred,
-                lb_pred_025=lb_pred_025,
-                lb_pred_10=lb_pred_10,
-                lb_pred_25=lb_pred_25,
-                ub_pred_25=ub_pred_25,
-                ub_pred_10=ub_pred_10,
-                ub_pred_025=ub_pred_025)
+        ub_pred_10 =
+            hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.9) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.9) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            ) .- mean_pred
+
+        ub_pred_025 =
+            hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            ) .- mean_pred
+        return (
+            mean_pred = mean_pred,
+            median_pred = median_pred,
+            lb_pred_025 = lb_pred_025,
+            lb_pred_10 = lb_pred_10,
+            lb_pred_25 = lb_pred_25,
+            ub_pred_25 = ub_pred_25,
+            ub_pred_10 = ub_pred_10,
+            ub_pred_025 = ub_pred_025,
+        )
     else
-        lb_pred_25 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for wk in 1:size(preds[1], 1)])
+        lb_pred_25 =
+            median_pred .- hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.25) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.25) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            )
 
-        lb_pred_10 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.10) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.10) for wk in 1:size(preds[1], 1)])
+        lb_pred_10 =
+            median_pred .- hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.10) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.10) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            )
 
-        lb_pred_025 = median_pred .- hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for wk in 1:size(preds[1], 1)])
+        lb_pred_025 =
+            median_pred .- hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.025) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.025) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            )
 
-        ub_pred_25 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for wk in 1:size(preds[1], 1)]) .- median_pred
+        ub_pred_25 =
+            hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.75) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.75) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            ) .- median_pred
 
-        ub_pred_10 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.9) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.9) for wk in 1:size(preds[1], 1)]) .- median_pred   
-            
-        ub_pred_025 = hcat([quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)],
-            [quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for wk in 1:size(preds[1], 1)]) .- median_pred
+        ub_pred_10 =
+            hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.9) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.9) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            ) .- median_pred
 
-        return (mean_pred=mean_pred, 
-                median_pred=median_pred,
-                lb_pred_025=lb_pred_025,
-                lb_pred_10=lb_pred_10,
-                lb_pred_25=lb_pred_25,
-                ub_pred_25=ub_pred_25,
-                ub_pred_10=ub_pred_10,
-                ub_pred_025=ub_pred_025)
+        ub_pred_025 =
+            hcat(
+                [
+                    quantile([preds[n][wk, 1] for n = 1:length(preds)], 0.975) for
+                    wk = 1:size(preds[1], 1)
+                ],
+                [
+                    quantile([preds[n][wk, 2] for n = 1:length(preds)], 0.975) for
+                    wk = 1:size(preds[1], 1)
+                ],
+            ) .- median_pred
+
+        return (
+            mean_pred = mean_pred,
+            median_pred = median_pred,
+            lb_pred_025 = lb_pred_025,
+            lb_pred_10 = lb_pred_10,
+            lb_pred_25 = lb_pred_25,
+            ub_pred_25 = ub_pred_25,
+            ub_pred_10 = ub_pred_10,
+            ub_pred_025 = ub_pred_025,
+        )
 
     end
 end
@@ -112,7 +228,16 @@ function matrix_cred_intervals(preds; central_est = :mean)
         ub_pred_025 .= ub_pred_025 .- mean_pred
         ub_pred_10 .= ub_pred_10 .- mean_pred
 
-        return (median_pred=median_pred, mean_pred=mean_pred, lb_pred_10 = lb_pred_10, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025, ub_pred_10 = ub_pred_10)
+        return (
+            median_pred = median_pred,
+            mean_pred = mean_pred,
+            lb_pred_10 = lb_pred_10,
+            lb_pred_025 = lb_pred_025,
+            lb_pred_25 = lb_pred_25,
+            ub_pred_25 = ub_pred_25,
+            ub_pred_025 = ub_pred_025,
+            ub_pred_10 = ub_pred_10,
+        )
     else
         for i = 1:d1, j = 1:d2
             v = [preds[n][i, j] for n = 1:num]
@@ -133,7 +258,16 @@ function matrix_cred_intervals(preds; central_est = :mean)
         ub_pred_025 .= ub_pred_025 .- median_pred
         ub_pred_10 .= ub_pred_10 .- median_pred
 
-        return (median_pred=median_pred, mean_pred=mean_pred, lb_pred_10 = lb_pred_10, lb_pred_025=lb_pred_025, lb_pred_25=lb_pred_25, ub_pred_25=ub_pred_25, ub_pred_025=ub_pred_025, ub_pred_10 = ub_pred_10)
+        return (
+            median_pred = median_pred,
+            mean_pred = mean_pred,
+            lb_pred_10 = lb_pred_10,
+            lb_pred_025 = lb_pred_025,
+            lb_pred_25 = lb_pred_25,
+            ub_pred_25 = ub_pred_25,
+            ub_pred_025 = ub_pred_025,
+            ub_pred_10 = ub_pred_10,
+        )
     end
 
 end
@@ -144,7 +278,7 @@ end
     Fit future change in risk based on posterior for first change point with extra dispersion due to `shrinkage`,
         and possible bias due to `bias_factor`.
 """
-function mom_fit_beta(X; shrinkage=1.0, bias_factor=1.0)
+function mom_fit_beta(X; shrinkage = 1.0, bias_factor = 1.0)
     x̄ = mean(X)
     v̄ = var(X)
     if v̄ < x̄ * (1 - x̄)
