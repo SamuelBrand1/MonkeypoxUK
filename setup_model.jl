@@ -16,40 +16,44 @@ N_msm = round(Int64, N_uk * prop_men * prop_ovr18 * prop_msm * prop_sexual_activ
 # with the 5th percentile of 4.2 days and the 95th percentile of 17.3 days (Table 2)
 
 # d_incubation = Gamma(6.77, 1 / 0.77)#Fit from rerunning - older version
-d_incubation = Weibull(1.4,8.5)
+d_incubation = Weibull(1.4, 8.5)
 negbin_std = fill(0.0, 7)
 for r = 1:7
     p = r / mean(d_incubation)
     negbin_std[r] = std(NegativeBinomial(r, p))
 end
 
-plt_incfit = bar(negbin_std,
-    title="Discrete time model vs data-driven model for incubation",
-    lab="",
-    xticks=1:7,
-    xlabel="Number of stages",
-    ylabel="Std. incubation (days)",
-    size=(800, 600), dpi=250,
-    legend=:top,
-    left_margin=5mm,
-    guidefont=16,
-    tickfont=13,
-    titlefont=17,
-    legendfont=12,
-    right_margin=5mm)
+plt_incfit = bar(
+    negbin_std,
+    title = "Discrete time model vs data-driven model for incubation",
+    lab = "",
+    xticks = 1:7,
+    xlabel = "Number of stages",
+    ylabel = "Std. incubation (days)",
+    size = (800, 600),
+    dpi = 250,
+    legend = :top,
+    left_margin = 5mm,
+    guidefont = 16,
+    tickfont = 13,
+    titlefont = 17,
+    legendfont = 12,
+    right_margin = 5mm,
+)
 
-hline!(plt_incfit, [std(d_incubation)], lab="std. of data-driven model")
+hline!(plt_incfit, [std(d_incubation)], lab = "std. of data-driven model")
 
-__ , n_optimal = findmin(abs.(negbin_std .- std(d_incubation)))
+__, n_optimal = findmin(abs.(negbin_std .- std(d_incubation)))
 #Optimal choice is 4 stages with effective rate to match the mean
 p_incubation = n_optimal / mean(d_incubation)
 α_incubation_eff = -log(1 - p_incubation)
-prob_bstfit = [zeros(n_optimal - 1); [pdf(NegativeBinomial(n_optimal, p_incubation), k) for k = 0:48]]
+prob_bstfit =
+    [zeros(n_optimal - 1); [pdf(NegativeBinomial(n_optimal, p_incubation), k) for k = 0:48]]
 
 bar!(
     plt_incfit,
     prob_bstfit,
-    lab="",
+    lab = "",
     color = :green,
     xlabel = "Incubation period (days)",
     ylabel = "Probability",
@@ -57,12 +61,13 @@ bar!(
     subplot = 2,
     grid = nothing,
     title = "",
-    yguidefont = 15
+    yguidefont = 15,
 )
 
 # Discretised pdf
 
-daily_incubation_prob = [cdf(d_incubation,t) - cdf(d_incubation,t-1) for t = 1:length(prob_bstfit)]
+daily_incubation_prob =
+    [cdf(d_incubation, t) - cdf(d_incubation, t - 1) for t = 1:length(prob_bstfit)]
 
 # plot!(
 #     plt_incfit,
@@ -78,10 +83,12 @@ savefig(plt_incfit, "plots/incubation_fit_revised.png")
 ## Next generation calculations
 
 function next_state_mat(p_inf)
-    [(1 - p_incubation) p_incubation 0 0;
-        0 (1 - p_incubation) p_incubation 0;
-        0 0 (1-p_inf) p_inf;
-        0 0 0 1]
+    [
+        (1-p_incubation) p_incubation 0 0
+        0 (1-p_incubation) p_incubation 0
+        0 0 (1-p_inf) p_inf
+        0 0 0 1
+    ]
 end
 
 function calculate_next_gen_distrib(ϵ, p_inf; n_max = 50)
@@ -96,7 +103,7 @@ function calculate_next_gen_distrib(ϵ, p_inf; n_max = 50)
     end
     normalize!(p_nextgen, 1)
     mean_ng = sum(collect(1:n_max) .* p_nextgen)
-    std_ng = sqrt(sum(collect(1:n_max).^2 .* p_nextgen) - mean_ng^2)
+    std_ng = sqrt(sum(collect(1:n_max) .^ 2 .* p_nextgen) - mean_ng^2)
     return mean_ng, std_ng, p_nextgen
 end
 
@@ -104,45 +111,64 @@ end
 
 using Roots
 prop_presymptomatic = 0.5
-epsilon = 
-    find_zero(ϵ -> calculate_next_gen_distrib(ϵ, 
-                    (p_incubation / ϵ) * (prop_presymptomatic/(1-prop_presymptomatic)))[1] - 9.25, 
-                    (0.2, 1.0))
+epsilon = find_zero(
+    ϵ ->
+        calculate_next_gen_distrib(
+            ϵ,
+            (p_incubation / ϵ) * (prop_presymptomatic / (1 - prop_presymptomatic)),
+        )[1] - 9.25,
+    (0.2, 1.0),
+)
 
-p_inf = (p_incubation / epsilon) * (prop_presymptomatic/(1-prop_presymptomatic))
+p_inf = (p_incubation / epsilon) * (prop_presymptomatic / (1 - prop_presymptomatic))
 γ_eff = -log(1 - p_inf)
-mean_ng, std_ng, p_nextgen = calculate_next_gen_distrib(epsilon, (p_incubation / epsilon) * (prop_presymptomatic/(1-prop_presymptomatic)))
+mean_ng, std_ng, p_nextgen = calculate_next_gen_distrib(
+    epsilon,
+    (p_incubation / epsilon) * (prop_presymptomatic / (1 - prop_presymptomatic)),
+)
 d_serial_interval = Gamma(0.7886, 1 / 0.0853)
 
 shape_scaler = find_zero(a -> std(Gamma(a * 0.7886, 1 / (a * 0.0853))) - std_ng, 1.0)
 
-p_serial_interval = [cdf(d_serial_interval,t) - cdf(d_serial_interval,t-1) for t = 1:50]
-p_serial_interval_disp = [cdf(Gamma(shape_scaler * 0.7886, 1 / (shape_scaler * 0.0853)),t) - cdf(Gamma(shape_scaler * 0.7886, 1 / (shape_scaler * 0.0853)),t-1) for t = 1:50]
+p_serial_interval = [cdf(d_serial_interval, t) - cdf(d_serial_interval, t - 1) for t = 1:50]
+p_serial_interval_disp = [
+    cdf(Gamma(shape_scaler * 0.7886, 1 / (shape_scaler * 0.0853)), t) -
+    cdf(Gamma(shape_scaler * 0.7886, 1 / (shape_scaler * 0.0853)), t - 1) for t = 1:50
+]
 ##
 
-plt_gen_distrib = scatter(p_nextgen, 
-                            lab = "Generation distribution (model)",
-                            ylabel = "Probability",
-                            xlabel = "Days after infection",
-                            alpha = 0.6,
-                            ms = 6,
-                            title = "Next generation distribution",
-                            size=(800, 600), dpi=250,
-                            left_margin=5mm,
-                            guidefont=16,
-                            tickfont=13,
-                            titlefont=24,
-                            legendfont=12,
-                            right_margin=5mm)
+plt_gen_distrib = scatter(
+    p_nextgen,
+    lab = "Generation distribution (model)",
+    ylabel = "Probability",
+    xlabel = "Days after infection",
+    alpha = 0.6,
+    ms = 6,
+    title = "Next generation distribution",
+    size = (800, 600),
+    dpi = 250,
+    left_margin = 5mm,
+    guidefont = 16,
+    tickfont = 13,
+    titlefont = 24,
+    legendfont = 12,
+    right_margin = 5mm,
+)
 
-scatter!(plt_gen_distrib, p_serial_interval, 
-                            lab = "Serial interval (Ward et al 2022)",
-                            ms = 6,
-                            alpha = 0.6)
-scatter!(plt_gen_distrib, p_serial_interval_disp,
-                            ms = 6,
-                            lab = "Serial interval (fixed mean, model std)",
-                            alpha = 0.6)
+scatter!(
+    plt_gen_distrib,
+    p_serial_interval,
+    lab = "Serial interval (Ward et al 2022)",
+    ms = 6,
+    alpha = 0.6,
+)
+scatter!(
+    plt_gen_distrib,
+    p_serial_interval_disp,
+    ms = 6,
+    lab = "Serial interval (fixed mean, model std)",
+    alpha = 0.6,
+)
 display(plt_gen_distrib)
 savefig(plt_gen_distrib, "plots/generation_distribution.png")
 
@@ -187,29 +213,31 @@ mean_daily_cnts =
     ) .|> x -> x / 365.25
 
 ##Plot sexual contact groups
-plt_ps = bar(ps,
-    yscale=:log10,
-    title="Proportion MSM in each group",
-    xticks=1:10,
-    ylabel="Proportion",
-    xlabel="Sexual activity group",
-    lab="")
-plt_μs = bar(mean_daily_cnts,
-    yscale=:log10,
-    title="Mean daily contact rates in each group",
-    xticks=1:10,
-    ylabel="Rate (days)",
-    xlabel="Sexual activity group",
-    lab="")
-hline!(plt_μs, [1 / 31], lab="Vac. threshold", lw=3, legend=:topleft)
-plt = plot(plt_ps, plt_μs,
-    size=(1000, 400),
-    bottom_margin=5mm, left_margin=5mm)
+plt_ps = bar(
+    ps,
+    yscale = :log10,
+    title = "Proportion MSM in each group",
+    xticks = 1:10,
+    ylabel = "Proportion",
+    xlabel = "Sexual activity group",
+    lab = "",
+)
+plt_μs = bar(
+    mean_daily_cnts,
+    yscale = :log10,
+    title = "Mean daily contact rates in each group",
+    xticks = 1:10,
+    ylabel = "Rate (days)",
+    xlabel = "Sexual activity group",
+    lab = "",
+)
+hline!(plt_μs, [1 / 31], lab = "Vac. threshold", lw = 3, legend = :topleft)
+plt = plot(plt_ps, plt_μs, size = (1000, 400), bottom_margin = 5mm, left_margin = 5mm)
 display(plt)
 # savefig(plt, "plots/sexual_activity_groups.png")
 
 
-## Set up for ABC
+## Set up constant data for ABC
 
 ingroup = 0.99
 n_cliques = 50
@@ -219,11 +247,6 @@ wkly_vaccinations = [
     [zeros(12); 1000; 2000; fill(5000, 4)] * 1.675
     fill(650, 20)
 ]
-
-wkly_novaccinations = zeros(size(wkly_vaccinations))
-
-wkly_vaccinations_ceased = [copy(wkly_vaccinations)[1:length(wks)+1]; fill(0, 52)]
-
 
 constants = [
     N_uk,
@@ -237,9 +260,9 @@ constants = [
     epsilon,
     n_cliques,
     wkly_vaccinations[3:end], #This because starting on week 3 
-    (0.85 + 0.7)/2,
+    (0.85 + 0.7) / 2,
     204,
-    2
+    2,
 ] #Constant values passed to the MPX model
 
 constants_no_vaccines = [
@@ -253,8 +276,8 @@ constants_no_vaccines = [
     γ_eff,
     epsilon,
     n_cliques,
-    wkly_novaccinations[3:end], #This because starting on week 3 
-    (0.85 + 0.7)/2,
+    zeros(1000), #This because starting on week 3 
+    (0.85 + 0.7) / 2,
     204,
-    2
+    2,
 ] #Constant values passed to the MPX model - with no vaccines

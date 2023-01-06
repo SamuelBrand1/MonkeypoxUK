@@ -5,7 +5,18 @@ Setup an initial state for the MPX model given overall population size `N_pop`, 
     mean weekly probability of detection `p_detect`, incubation rate `α_incubation_eff`, proportion MSM in each sexual activity group `ps`, and initial scale of number of infected `init_scale`. Output 
     initial MSM population array `u0_msm`, initial non-MSM array `u0_other`, metapopulation sizes, total population in each metapopulation/sexual activity group.
 """
-function setup_initial_state(N_pop, N_msm, α_choose, p_detect, α_incubation_eff, ps, init_scale; n_states=7, n_cliques=50, n_infected_states = 3)
+function setup_initial_state(
+    N_pop,
+    N_msm,
+    α_choose,
+    p_detect,
+    α_incubation_eff,
+    ps,
+    init_scale;
+    n_states = 7,
+    n_cliques = 50,
+    n_infected_states = 3,
+)
     u0_msm = zeros(Int64, n_states, length(ps), n_cliques)
     u0_other = zeros(Int64, n_states)
     N_clique = rand(DirichletMultinomial(N_msm, α_choose * ones(n_cliques)))
@@ -15,12 +26,15 @@ function setup_initial_state(N_pop, N_msm, α_choose, p_detect, α_incubation_ef
     #Add infecteds so that expected detections on week 1 are 1
     choose_clique = rand(Categorical(normalize(N_clique, 1)))
     av_infs = n_infected_states * init_scale / (p_detect * (1 - exp(-α_incubation_eff))) #Set av number of infecteds in each of `n_infected_states` categories of incubation and infectious rescaled by daily probability of detection if infectious
-    u0_msm[2:(n_infected_states+1), :, choose_clique] .= map(μ -> rand(Poisson(μ)), fill(av_infs / (n_infected_states * length(ps)), n_infected_states, length(ps)))
-    u0_msm = u0_msm[:, :, N_clique .> 0] #Reduce group size
+    u0_msm[2:(n_infected_states+1), :, choose_clique] .= map(
+        μ -> rand(Poisson(μ)),
+        fill(av_infs / (n_infected_states * length(ps)), n_infected_states, length(ps)),
+    )
+    u0_msm = u0_msm[:, :, N_clique.>0] #Reduce group size
     #Set up non MSM population
     u0_other[1] = N_pop - N_msm
     N_grp_msm = u0_msm[1, :, :]
-    return u0_msm, u0_other, N_clique[N_clique .> 0], N_grp_msm
+    return u0_msm, u0_other, N_clique[N_clique.>0], N_grp_msm
 end
 
 """
@@ -28,7 +42,7 @@ end
 
 Setup the two matrices used in calculating daily force of infection due to infectious MSM individuals.        
 """
-function setup_transmission_matrix(ms, ps, N_clique; ingroup=0.99)
+function setup_transmission_matrix(ms, ps, N_clique; ingroup = 0.99)
     n_cliques = length(N_clique)
     n_grps = length(ps)
     B = Matrix{Float64}(undef, n_cliques, n_cliques) #Between group contacting
@@ -82,7 +96,8 @@ function f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, ϵ)
     # Number of events
 
     num_infs = map((n, p) -> rand(Binomial(n, p)), S, 1 .- exp.(-(λ .+ λ_other))) # infections among MSM
-    num_infs_vac = map((n, p) -> rand(Binomial(n, p)), V, 1 .- exp.(-(1 - vac_eff) * (λ .+ λ_other))) # infections among MSM with vaccine
+    num_infs_vac =
+        map((n, p) -> rand(Binomial(n, p)), V, 1 .- exp.(-(1 - vac_eff) * (λ .+ λ_other))) # infections among MSM with vaccine
     num_incs1 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), E) # incubation among MSM
     num_incs2 = map(n -> rand(Binomial(n, 1 - exp(-α_incubation))), P) # incubation among MSM
     num_recs = map(n -> rand(Binomial(n, 1 - exp(-γ_eff))), I)#recovery among MSM
@@ -129,18 +144,50 @@ Simulation function for the MPX transmission model with change points. Outputs t
 """
 function mpx_sim_function_chp(params, constants, wkly_cases)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ts,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    wkly_vaccinations,
+    vac_effectiveness,
+    chp_t2,
+    weeks_to_change = constants
 
     #Get parameters and make parameter transformations transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2 = params
 
 
-    vac_effectiveness = rand(Uniform(0.7,0.85))
+    vac_effectiveness = rand(Uniform(0.7, 0.85))
     κ = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_cliques=n_cliques)
-    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(
+        N_total,
+        N_msm,
+        α_choose,
+        p_detect,
+        α_incubation,
+        ps,
+        init_scale;
+        n_cliques = n_cliques,
+    )
+    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup = ingroup)
 
     #Simulate and track error
     L1_rel_err = 0.0
@@ -148,17 +195,20 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     #Initialise simulation
     u_mpx = ArrayPartition(u0_msm, u0_other)
-    prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon), #Simulation update function
-                            u_mpx, #Initial state
-                            (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)), #Start week before detection
-                            [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness]) #Basic simulation parameters
-    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    prob = DiscreteProblem(
+        (du, u, p, t) ->
+            f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon), #Simulation update function
+        u_mpx, #Initial state
+        (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)), #Start week before detection
+        [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness],
+    ) #Basic simulation parameters
+    mpx_init = init(prob, FunctionMap(), save_everystep = false) #Begins week 1
 
     #Initialise arrays tracking observables and generated quantities of the simulation
     old_onsets = [0, 0]
     new_onsets = [0, 0]
-    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
-    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    old_sus = [sum(u0_msm[1, :, :][:, :], dims = 2)[:]; u0_other[1]]
+    new_sus = [sum(u0_msm[1, :, :][:, :], dims = 2)[:]; u0_other[1]]
     wk_num = 1
     detected_cases = zeros(size(wkly_cases))
     onsets = zeros(size(wkly_cases))
@@ -180,35 +230,70 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         end
 
         #Step dynamics forward a week
-        for day in 1:7 
+        for day = 1:7
             #Calculate effective transmission rates for each day of transmission
-            mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red2)
-            mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red_other2)
+            mpx_init.p[1] =
+                mpx_init.t < chp_t2 ?
+                p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ)) :
+                p_trans *
+                (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ)) *
+                (1 - trans_red2)
+            mpx_init.p[2] =
+                mpx_init.t < chp_t2 ?
+                R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ)) :
+                R0_other *
+                (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ)) *
+                (1 - trans_red_other2)
             step!(mpx_init, 1) # Dynamics for day
-        end 
-       
+        end
+
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
-        num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
+        num_vaccines = map(
+            (μ, maxval) -> min(rand(Poisson(μ)), maxval),
+            vac_rate,
+            du_vac.x[1][1, 3:end, :],
+        )
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
         du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, generate observed cases and score errors        
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
-        actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:, :], dims = 2)[:]; mpx_init.u.x[2][1]]
+        actual_obs = [
+            rand(
+                BetaBinomial(
+                    new_onsets[1] - old_onsets[1],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+            rand(
+                BetaBinomial(
+                    new_onsets[2] - old_onsets[2],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+        ]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         onsets[wk_num, :] .= new_onsets #lag 1 week
-        incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        susceptibility[wk_num, :] .= (new_sus .+ (1 - vac_effectiveness) .* [sum(mpx_init.u.x[1][6, :, :][:,:],dims = 2)[:]; 0]) ./ [N_msm .* ps; N_total - N_msm]
+        incidence[wk_num, :] .=
+            old_sus .- new_sus .- [0; 0; sum(num_vaccines, dims = 2)[:]; 0] #Total infections = reduction in susceptibles - number vaccinated
+        susceptibility[wk_num, :] .=
+            (
+                new_sus .+
+                (1 - vac_effectiveness) .*
+                [sum(mpx_init.u.x[1][6, :, :][:, :], dims = 2)[:]; 0]
+            ) ./ [N_msm .* ps; N_total - N_msm]
 
         if wk_num < size(wkly_cases, 1)  # Leave last week out due to right censoring issues 
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
-        
+
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
@@ -216,7 +301,17 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, (;detected_cases, onsets, incidence, susceptibility, vac_effectiveness, state_pre_vaccine, state_sept, end_state)
+    return L1_rel_err,
+    (;
+        detected_cases,
+        onsets,
+        incidence,
+        susceptibility,
+        vac_effectiveness,
+        state_pre_vaccine,
+        state_sept,
+        end_state,
+    )
 end
 
 """
@@ -227,11 +322,40 @@ Simulation function for the MPX transmission model with change points. Outputs t
 """
 function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ts,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    wkly_vaccinations,
+    vac_effectiveness,
+    chp_t2,
+    weeks_to_change = constants
 
     #Get parameters and make parameter transformations transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2, α_choose_nb, p_detect_nb, p_trans_nb, R0_other_nb, init_scale_nb, prob_mdl_choice = params
-    mdl_choice = rand(Bernoulli(prob_mdl_choice)) 
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2,
+    α_choose_nb,
+    p_detect_nb,
+    p_trans_nb,
+    R0_other_nb,
+    init_scale_nb,
+    prob_mdl_choice = params
+    mdl_choice = rand(Bernoulli(prob_mdl_choice))
     #Choose model, if true then its the no behaviour change model
     if mdl_choice
         α_choose = α_choose_nb
@@ -244,15 +368,24 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
         trans_red2 = 0.0
         trans_red_other2 = 0.0
     end
-    
-    vac_effectiveness = rand(Uniform(0.7,0.85))
+
+    vac_effectiveness = rand(Uniform(0.7, 0.85))
     κ = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
     # trans_red2 = scale_trans_red2
     # trans_red_other2 = scale_red_other2
 
     #Generate random population structure
-    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(N_total, N_msm, α_choose, p_detect, α_incubation, ps, init_scale; n_cliques=n_cliques)
-    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+    u0_msm, u0_other, N_clique, N_grp_msm = setup_initial_state(
+        N_total,
+        N_msm,
+        α_choose,
+        p_detect,
+        α_incubation,
+        ps,
+        init_scale;
+        n_cliques = n_cliques,
+    )
+    Λ, B = setup_transmission_matrix(ms, ps, N_clique; ingroup = ingroup)
 
     #Simulate and track error
     L1_rel_err = 0.0
@@ -260,17 +393,20 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
 
     #Initialise simulation
     u_mpx = ArrayPartition(u0_msm, u0_other)
-    prob = DiscreteProblem((du, u, p, t) -> f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon), #Simulation update function
-                            u_mpx, #Initial state
-                            (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)), #Start week before detection
-                            [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness]) #Basic simulation parameters
-    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    prob = DiscreteProblem(
+        (du, u, p, t) ->
+            f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon), #Simulation update function
+        u_mpx, #Initial state
+        (ts[1] - 7, ts[1] - 7 + 7 * size(wkly_cases, 1)), #Start week before detection
+        [p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness],
+    ) #Basic simulation parameters
+    mpx_init = init(prob, FunctionMap(), save_everystep = false) #Begins week 1
 
     #Initialise arrays tracking observables and generated quantities of the simulation
     old_onsets = [0, 0]
     new_onsets = [0, 0]
-    old_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
-    new_sus = [sum(u0_msm[1, :, :][:,:],dims = 2)[:]; u0_other[1]]
+    old_sus = [sum(u0_msm[1, :, :][:, :], dims = 2)[:]; u0_other[1]]
+    new_sus = [sum(u0_msm[1, :, :][:, :], dims = 2)[:]; u0_other[1]]
     wk_num = 1
     detected_cases = zeros(size(wkly_cases))
     onsets = zeros(size(wkly_cases))
@@ -292,35 +428,70 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
         end
 
         #Step dynamics forward a week
-        for day in 1:7 
+        for day = 1:7
             #Calculate effective transmission rates for each day of transmission
-            mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red2)
-            mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ)) * (1 - trans_red_other2)
+            mpx_init.p[1] =
+                mpx_init.t < chp_t2 ?
+                p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ)) :
+                p_trans *
+                (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ)) *
+                (1 - trans_red2)
+            mpx_init.p[2] =
+                mpx_init.t < chp_t2 ?
+                R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ)) :
+                R0_other *
+                (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ)) *
+                (1 - trans_red_other2)
             step!(mpx_init, 1) # Dynamics for day
-        end 
-       
+        end
+
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
-        num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
+        num_vaccines = map(
+            (μ, maxval) -> min(rand(Poisson(μ)), maxval),
+            vac_rate,
+            du_vac.x[1][1, 3:end, :],
+        )
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
         du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, generate observed cases and score errors        
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
-        actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:, :], dims = 2)[:]; mpx_init.u.x[2][1]]
+        actual_obs = [
+            rand(
+                BetaBinomial(
+                    new_onsets[1] - old_onsets[1],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+            rand(
+                BetaBinomial(
+                    new_onsets[2] - old_onsets[2],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+        ]
         detected_cases[wk_num, :] .= actual_obs #lag 1 week
         onsets[wk_num, :] .= new_onsets #lag 1 week
-        incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        susceptibility[wk_num, :] .= (new_sus .+ (1 - vac_effectiveness) .* [sum(mpx_init.u.x[1][6, :, :][:,:],dims = 2)[:]; 0]) ./ [N_msm .* ps; N_total - N_msm]
+        incidence[wk_num, :] .=
+            old_sus .- new_sus .- [0; 0; sum(num_vaccines, dims = 2)[:]; 0] #Total infections = reduction in susceptibles - number vaccinated
+        susceptibility[wk_num, :] .=
+            (
+                new_sus .+
+                (1 - vac_effectiveness) .*
+                [sum(mpx_init.u.x[1][6, :, :][:, :], dims = 2)[:]; 0]
+            ) ./ [N_msm .* ps; N_total - N_msm]
 
         if wk_num < size(wkly_cases, 1)  # Leave last week out due to right censoring issues 
             L1_rel_err += sum(abs, actual_obs .- wkly_cases[wk_num, :]) / total_cases #lag 1 week
         end
-        
+
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
@@ -328,7 +499,18 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
 
     end_state = mpx_init.u #For doing projections
 
-    return L1_rel_err, (;detected_cases, onsets, incidence, susceptibility, vac_effectiveness, state_pre_vaccine, state_sept, end_state, mdl_choice)
+    return L1_rel_err,
+    (;
+        detected_cases,
+        onsets,
+        incidence,
+        susceptibility,
+        vac_effectiveness,
+        state_pre_vaccine,
+        state_sept,
+        end_state,
+        mdl_choice,
+    )
 end
 
 
@@ -340,7 +522,20 @@ not reversion in behavioural risk of transmission.
 """
 function mpx_sim_function_projections(params, constants, interventions, init_condition)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ts,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    wkly_vaccinations,
+    vac_effectiveness,
+    chp_t2,
+    weeks_to_change = constants
 
     # #Get intervention data
     ts = interventions.ts
@@ -348,44 +543,77 @@ function mpx_sim_function_projections(params, constants, interventions, init_con
     vac_effectiveness = interventions.vac_effectiveness
 
     # #Get parameters and make transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2 = params
     weeks_to_project = length(ts)
     ts_0 = ts[1]
     κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
     # # Generate transmission matrices based on the inital state
-    N_clique = sum(init_condition.x[1], dims = [1,2])[:]
+    N_clique = sum(init_condition.x[1], dims = [1, 2])[:]
     N_grp_msm = sum(init_condition.x[1], dims = 1)[1, :, :]
-    Λ, B = MonkeypoxUK.setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+    Λ, B = MonkeypoxUK.setup_transmission_matrix(ms, ps, N_clique; ingroup = ingroup)
 
     #Project forwards
 
     _p = copy([p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
-    prob = DiscreteProblem((du, u, p, t) -> MonkeypoxUK.f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon),
-                        init_condition, 
-                        (ts_0, ts_0 + 7 * weeks_to_project),
-                        _p)
-    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    prob = DiscreteProblem(
+        (du, u, p, t) -> MonkeypoxUK.f_mpx_vac(
+            du,
+            u,
+            p,
+            t,
+            Λ,
+            B,
+            N_msm,
+            N_grp_msm,
+            N_total,
+            epsilon,
+        ),
+        init_condition,
+        (ts_0, ts_0 + 7 * weeks_to_project),
+        _p,
+    )
+    mpx_init = init(prob, FunctionMap(), save_everystep = false) #Begins week 1
 
     # #Set up arrays for tracking epidemiological observables
-    
+
     old_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
     new_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
-    old_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
-    new_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
+    old_sus = [sum(init_condition.x[1][1, :, :][:, :], dims = 2)[:]; init_condition.x[2][1]]
+    new_sus = [sum(init_condition.x[1][1, :, :][:, :], dims = 2)[:]; init_condition.x[2][1]]
     wk_num = 1
     detected_cases = zeros(weeks_to_project, 2)
     incidence = zeros(Int64, weeks_to_project, 11)
-    
+
 
     # #Step through the dynamics
     while wk_num <= weeks_to_project #Step forward a week
-        
+
         for day = 1:7
             #Calculate effective transmission rates for each day of transmission
-            mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) * (1 - trans_red2)
-            mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng))  * (1 - trans_red_other2)
-            
+            mpx_init.p[1] =
+                mpx_init.t < chp_t2 ?
+                p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ_cng)) :
+                p_trans *
+                (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ_cng)) *
+                (1 - trans_red2)
+            mpx_init.p[2] =
+                mpx_init.t < chp_t2 ?
+                R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ_cng)) :
+                R0_other *
+                (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ_cng)) *
+                (1 - trans_red_other2)
+
             step!(mpx_init, 1)
         end
 
@@ -393,25 +621,45 @@ function mpx_sim_function_projections(params, constants, interventions, init_con
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
-        num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
+        num_vaccines = map(
+            (μ, maxval) -> min(rand(Poisson(μ)), maxval),
+            vac_rate,
+            du_vac.x[1][1, 3:end, :],
+        )
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
         du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
-        actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:, :], dims = 2)[:]; mpx_init.u.x[2][1]]
+        actual_obs = [
+            rand(
+                BetaBinomial(
+                    new_onsets[1] - old_onsets[1],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+            rand(
+                BetaBinomial(
+                    new_onsets[2] - old_onsets[2],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+        ]
         detected_cases[wk_num, :] .= Float64.(actual_obs)
-        incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        
+        incidence[wk_num, :] .=
+            old_sus .- new_sus .- [0; 0; sum(num_vaccines, dims = 2)[:]; 0] #Total infections = reduction in susceptibles - number vaccinated
+
         #Move time forwards one week
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
     end
 
-    return (;detected_cases, incidence)
+    return (; detected_cases, incidence)
 end
 
 """
@@ -420,63 +668,118 @@ end
 Project forwards from an initial state `init_condition`, with model parameters `params` and vaccine deployment defined by the `NamedTuple` object `interventions`. This model assumes
 that there is reversion in behavioural risk of transmission starting in the first week of September which occurs over `weeks_to_reversion` weeks.        
 """
-function mpx_sim_function_projections(params, constants, interventions, init_condition, weeks_to_reversion)
+function mpx_sim_function_projections(
+    params,
+    constants,
+    interventions,
+    init_condition,
+    weeks_to_reversion,
+)
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ts,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    wkly_vaccinations,
+    vac_effectiveness,
+    chp_t2,
+    weeks_to_change = constants
 
-    # #Get intervention data
+    #Get intervention data
     ts = interventions.ts
     wkly_vaccinations = interventions.wkly_vaccinations
     vac_effectiveness = interventions.vac_effectiveness
 
-    # #Get parameters and make transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    #Get parameters and make transformations
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2 = params
     weeks_to_project = length(ts)
     ts_0 = ts[1]
     κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
     # Calculate logistic reversion to pre-change
-    p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
-    R_oth_min = R0_other*(1 - trans_red_other)*(1 - trans_red_other2)
-    T₅₀ = (Date(2022,9,1) - Date(2021,12,31)).value + (weeks_to_reversion * 7 / 2) # 50% return to normal point
+    p_min = p_trans * (1 - trans_red) * (1 - trans_red2)
+    R_oth_min = R0_other * (1 - trans_red_other) * (1 - trans_red_other2)
+    T₅₀ = (Date(2022, 9, 1) - Date(2021, 12, 31)).value + (weeks_to_reversion * 7 / 2) # 50% return to normal point
     κ_rev = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
     # # Generate transmission matrices based on the inital state
-    N_clique = sum(init_condition.x[1], dims = [1,2])[:]
+    N_clique = sum(init_condition.x[1], dims = [1, 2])[:]
     N_grp_msm = sum(init_condition.x[1], dims = 1)[1, :, :]
-    Λ, B = MonkeypoxUK.setup_transmission_matrix(ms, ps, N_clique; ingroup=ingroup)
+    Λ, B = MonkeypoxUK.setup_transmission_matrix(ms, ps, N_clique; ingroup = ingroup)
 
     #Project forwards
 
     _p = copy([p_trans, R0_other, γ_eff, α_incubation, vac_effectiveness])
-    prob = DiscreteProblem((du, u, p, t) -> MonkeypoxUK.f_mpx_vac(du, u, p, t, Λ, B, N_msm, N_grp_msm, N_total, epsilon),
-                        init_condition, 
-                        (ts_0, ts_0 + 7 * weeks_to_project),
-                        _p)
-    mpx_init = init(prob, FunctionMap(), save_everystep=false) #Begins week 1
+    prob = DiscreteProblem(
+        (du, u, p, t) -> MonkeypoxUK.f_mpx_vac(
+            du,
+            u,
+            p,
+            t,
+            Λ,
+            B,
+            N_msm,
+            N_grp_msm,
+            N_total,
+            epsilon,
+        ),
+        init_condition,
+        (ts_0, ts_0 + 7 * weeks_to_project),
+        _p,
+    )
+    mpx_init = init(prob, FunctionMap(), save_everystep = false) #Begins week 1
 
     # #Set up arrays for tracking epidemiological observables
-    
+
     old_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
     new_onsets = [sum(init_condition.x[1][end, :, :]), init_condition.x[2][end]]
-    old_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
-    new_sus = [sum(init_condition.x[1][1, :, :][:,:],dims = 2)[:]; init_condition.x[2][1]]
+    old_sus = [sum(init_condition.x[1][1, :, :][:, :], dims = 2)[:]; init_condition.x[2][1]]
+    new_sus = [sum(init_condition.x[1][1, :, :][:, :], dims = 2)[:]; init_condition.x[2][1]]
     wk_num = 1
     detected_cases = zeros(weeks_to_project, 2)
     incidence = zeros(Int64, weeks_to_project, 11)
-    
+
 
     # #Step through the dynamics
     while wk_num <= weeks_to_project #Step forward a week
-        
+
         for day = 1:7
             #Calculate effective transmission rates for each day of transmission
-            if mpx_init.t < (Date(2022,9,1) - Date(2021,12,31)).value
-                mpx_init.p[1] = mpx_init.t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t)/κ_cng)) * (1 - trans_red2)
-                mpx_init.p[2] = mpx_init.t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((mpx_init.t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+            if mpx_init.t < (Date(2022, 9, 1) - Date(2021, 12, 31)).value
+                mpx_init.p[1] =
+                    mpx_init.t < chp_t2 ?
+                    p_trans * (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ_cng)) :
+                    p_trans *
+                    (1 - trans_red * sigmoid((mpx_init.t - chp_t) / κ_cng)) *
+                    (1 - trans_red2)
+                mpx_init.p[2] =
+                    mpx_init.t < chp_t2 ?
+                    R0_other *
+                    (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ_cng)) :
+                    R0_other *
+                    (1 - trans_red_other * sigmoid((mpx_init.t - chp_t) / κ_cng)) *
+                    (1 - trans_red_other2)
             else
-                mpx_init.p[1] = p_min + (p_trans - p_min) * sigmoid((mpx_init.t - T₅₀)/κ_rev)
-                mpx_init.p[2] = R_oth_min + (R0_other - R_oth_min) * sigmoid((mpx_init.t - T₅₀)/κ_rev)
+                mpx_init.p[1] =
+                    p_min + (p_trans - p_min) * sigmoid((mpx_init.t - T₅₀) / κ_rev)
+                mpx_init.p[2] =
+                    R_oth_min + (R0_other - R_oth_min) * sigmoid((mpx_init.t - T₅₀) / κ_rev)
             end
             step!(mpx_init, 1)
         end
@@ -485,25 +788,45 @@ function mpx_sim_function_projections(params, constants, interventions, init_con
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
         vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
-        num_vaccines = map((μ, maxval) -> min(rand(Poisson(μ)), maxval), vac_rate, du_vac.x[1][1, 3:end, :])
+        num_vaccines = map(
+            (μ, maxval) -> min(rand(Poisson(μ)), maxval),
+            vac_rate,
+            du_vac.x[1][1, 3:end, :],
+        )
         du_vac.x[1][1, 3:end, :] .-= num_vaccines
         du_vac.x[1][6, 3:end, :] .+= num_vaccines
         set_u!(mpx_init, du_vac) #Change the state of the model
 
         #Calculate actual onsets, actual infections, actual prevelance, generate observed cases and score errors
         new_onsets = [sum(mpx_init.u.x[1][end, :, :]), mpx_init.u.x[2][end]]
-        new_sus = [sum(mpx_init.u.x[1][1, :, :][:,:],dims = 2)[:]; mpx_init.u.x[2][1]]
-        actual_obs = [rand(BetaBinomial(new_onsets[1] - old_onsets[1], p_detect * M, (1 - p_detect) * M)), rand(BetaBinomial(new_onsets[2] - old_onsets[2], p_detect * M, (1 - p_detect) * M))]
+        new_sus = [sum(mpx_init.u.x[1][1, :, :][:, :], dims = 2)[:]; mpx_init.u.x[2][1]]
+        actual_obs = [
+            rand(
+                BetaBinomial(
+                    new_onsets[1] - old_onsets[1],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+            rand(
+                BetaBinomial(
+                    new_onsets[2] - old_onsets[2],
+                    p_detect * M,
+                    (1 - p_detect) * M,
+                ),
+            ),
+        ]
         detected_cases[wk_num, :] .= Float64.(actual_obs)
-        incidence[wk_num, :] .= old_sus .- new_sus .- [0;0;sum(num_vaccines,dims = 2)[:];0] #Total infections = reduction in susceptibles - number vaccinated
-        
+        incidence[wk_num, :] .=
+            old_sus .- new_sus .- [0; 0; sum(num_vaccines, dims = 2)[:]; 0] #Total infections = reduction in susceptibles - number vaccinated
+
         #Move time forwards one week
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
     end
 
-    return (;detected_cases, incidence)
+    return (; detected_cases, incidence)
 end
 
 
@@ -525,19 +848,42 @@ function reproductive_ratios(
     weeks_to_reversion,
     ts;
     av_cnt_rate = 1.978375735058361,
-    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value
+    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value,
 )
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ___, α_incubation, γ_eff, epsilon, n_cliques, _, __, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ___,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    _,
+    __,
+    chp_t2,
+    weeks_to_change = constants
 
     # #Get parameters and make transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2 = params
     κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
     mean_inf_period = (epsilon / (1 - exp(-α_incubation))) + (1 / (1 - exp(-γ_eff)))
 
     # Calculate logistic reversion to pre-change
-    p_min = p_trans*(1 - trans_red)*(1 - trans_red2)
-    R_oth_min = R0_other*(1 - trans_red_other)*(1 - trans_red_other2)
+    p_min = p_trans * (1 - trans_red) * (1 - trans_red2)
+    R_oth_min = R0_other * (1 - trans_red_other) * (1 - trans_red_other2)
     T₅₀ = reversion_time + (weeks_to_reversion * 7 / 2) # 50% return to normal point
     κ_rev = (weeks_to_reversion * 7 / 2) / 4.6 # logistic scale for return to normal: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
 
@@ -547,17 +893,24 @@ function reproductive_ratios(
 
     for (i, t) in enumerate(ts)
         if t < reversion_time
-            R₀_gbmsm[i] = t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) * (1 - trans_red2)
-            R₀_ngbmsm[i] = t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+            R₀_gbmsm[i] =
+                t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t) / κ_cng)) :
+                p_trans * (1 - trans_red * sigmoid((t - chp_t) / κ_cng)) * (1 - trans_red2)
+            R₀_ngbmsm[i] =
+                t < chp_t2 ?
+                R0_other * (1 - trans_red_other * sigmoid((t - chp_t) / κ_cng)) :
+                R0_other *
+                (1 - trans_red_other * sigmoid((t - chp_t) / κ_cng)) *
+                (1 - trans_red_other2)
             R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
         else
-            R₀_gbmsm[i] = p_min + (p_trans - p_min) * sigmoid((t - T₅₀)/κ_rev)
-            R₀_ngbmsm[i] = R_oth_min + (R0_other - R_oth_min) * sigmoid((t - T₅₀)/κ_rev)
+            R₀_gbmsm[i] = p_min + (p_trans - p_min) * sigmoid((t - T₅₀) / κ_rev)
+            R₀_ngbmsm[i] = R_oth_min + (R0_other - R_oth_min) * sigmoid((t - T₅₀) / κ_rev)
             R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
         end
     end
 
-    return (;R₀_gbmsm, R₀_ngbmsm)
+    return (; R₀_gbmsm, R₀_ngbmsm)
 end
 
 
@@ -578,13 +931,36 @@ function reproductive_ratios(
     constants,
     ts;
     av_cnt_rate = 1.978375735058361,
-    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value
+    reversion_time = (Date(2022, 9, 1) - Date(2021, 12, 31)).value,
 )
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ___, α_incubation, γ_eff, epsilon, n_cliques, _, __, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ___,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    _,
+    __,
+    chp_t2,
+    weeks_to_change = constants
 
     # #Get parameters and make transformations
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2 = params
     κ_cng = (weeks_to_change * 7 / 2) / 4.6 # logistic scale for behaviour change to occur over: 4.6 is κ = 1 time to go from 0.01 to 0.5 and 0.5 to 0.99
     mean_inf_period = (epsilon / (1 - exp(-α_incubation))) + (1 / (1 - exp(-γ_eff)))
 
@@ -594,11 +970,16 @@ function reproductive_ratios(
     R₀_ngbmsm = Vector{Float64}(undef, length(ts))
 
     for (i, t) in enumerate(ts)
-        R₀_gbmsm[i] = t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) : p_trans * (1 - trans_red * sigmoid((t - chp_t)/κ_cng)) * (1 - trans_red2)
-        R₀_ngbmsm[i] = t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng)) : R0_other * (1 - trans_red_other * sigmoid((t - chp_t)/κ_cng))  * (1 - trans_red_other2)
+        R₀_gbmsm[i] =
+            t < chp_t2 ? p_trans * (1 - trans_red * sigmoid((t - chp_t) / κ_cng)) :
+            p_trans * (1 - trans_red * sigmoid((t - chp_t) / κ_cng)) * (1 - trans_red2)
+        R₀_ngbmsm[i] =
+            t < chp_t2 ? R0_other * (1 - trans_red_other * sigmoid((t - chp_t) / κ_cng)) :
+            R0_other *
+            (1 - trans_red_other * sigmoid((t - chp_t) / κ_cng)) *
+            (1 - trans_red_other2)
         R₀_gbmsm[i] *= mean_inf_period * av_cnt_rate
     end
 
-    return (;R₀_gbmsm, R₀_ngbmsm)
+    return (; R₀_gbmsm, R₀_ngbmsm)
 end
-

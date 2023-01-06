@@ -5,8 +5,9 @@ using JLD2, MCMCChains
 using MonkeypoxUK
 
 ## Grab UK data and setup model
-past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
-                                missingstring = "NA") |> DataFrame
+past_mpxv_data_inferred =
+    CSV.File("data/weekly_data_imputation_2022-09-30.csv", missingstring = "NA") |>
+    DataFrame
 
 colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
@@ -16,7 +17,7 @@ mpxv_wkly =
     hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm) |> Matrix
 
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
-                                
+
 # Leave out first two weeks because reporting changed in early May
 mpxv_wkly = mpxv_wkly[3:end, :]
 wks = wks[3:end]
@@ -39,7 +40,14 @@ wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/m
 
 ##Load posterior draws and structure
 
-smc = MonkeypoxUK.load_smc("posteriors/smc_posterior_draws_2022-09-26no_ngbmsm_chg.jld2")
+date_str = "2022-09-26"
+description_str = "no_bv_cng"
+# description_str = "no_ngbmsm_chg"
+# description_str = "one_metapop"
+
+smc = MonkeypoxUK.load_smc(
+    "posteriors/smc_posterior_draws_" * date_str * description_str * ".jld2",
+)
 # param_draws = load("posteriors/posterior_param_draws_2022-09-26_noR_ngbmsm.jld2")["param_draws"]
 param_draws = [particle.params for particle in smc.particles]
 
@@ -140,10 +148,33 @@ function construct_next_gen_mat(
     vac_eff::Union{Nothing,Number} = nothing,
 )
     #Get parameters 
-    α_choose, p_detect, p_trans, R0_other, M, init_scale, chp_t, trans_red, trans_red_other, trans_red2, trans_red_other2 = params
+    α_choose,
+    p_detect,
+    p_trans,
+    R0_other,
+    M,
+    init_scale,
+    chp_t,
+    trans_red,
+    trans_red_other,
+    trans_red2,
+    trans_red_other2 = params
 
     #Get constant data
-    N_total, N_msm, ps, ms, ingroup, ts, α_incubation, γ_eff, epsilon, n_cliques, wkly_vaccinations, vac_effectiveness, chp_t2, weeks_to_change = constants
+    N_total,
+    N_msm,
+    ps,
+    ms,
+    ingroup,
+    ts,
+    α_incubation,
+    γ_eff,
+    epsilon,
+    n_cliques,
+    wkly_vaccinations,
+    vac_effectiveness,
+    chp_t2,
+    weeks_to_change = constants
 
 
     if ~isnothing(vac_eff)
