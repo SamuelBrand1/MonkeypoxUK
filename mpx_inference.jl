@@ -39,7 +39,7 @@ prior_vect_cng_pnt = [
     LogNormal(log(5), 1),#init_scale 6
     Uniform(135, 199),# chp_t 7
     Beta(1.5,1.5),#trans_red 8
-    Beta(1.5,1.5),#trans_red_other 9
+    Uniform(0.0,1e-10),#trans_red_other 9
     Beta(1.5,1.5),#trans_red WHO  10 
     Uniform(0.0,1e-10),#trans_red_other WHO 11
 ]
@@ -72,7 +72,7 @@ setup_cng_pnt = ABCSMC(
 ##Run ABC and save results   
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
-description_str = "no_who_cng"
+description_str = "only_gbmsm_bv_cng"
 @save("posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * ".jld2", smc_cng_pnt) #<--- this can be too large
 ##
 
