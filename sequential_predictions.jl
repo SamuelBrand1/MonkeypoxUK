@@ -64,77 +64,86 @@ seq_mpxv_wklys = [
     mpxv_wkly,
 ]
 
-##
+## Include useful functions for projections 
 
-## Load posterior draws and saved trajectiories
+include("projection_functions.jl");
+
+## 
 
 description_str = "no_ngbmsm_chg" #<---- This is the main model
 # description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
 # description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
-# description_str = "" #<--- this is the older version main model
+# description_str = "no_ngbmsm_chg" #<--- this is the older version main model
 
+proj_weeks = seq_wks[1]
+start_wk = proj_weeks[end] 
+plt1 = plot()
+plt2 = plot()
+err2, err_range2 = load_data_and_make_proj(start_wk, description_str, plt1, plt2, 1, "No behaviour change"; pheic_effect = false)
 
-function load_posteriors_for_projection(date_str, description_str; pheic_effect = true)
-    param_draws =
-    load("posteriors/posterior_param_draws_" * date_str * description_str * ".jld2")["param_draws"]
-    detected_cases =
-        load("posteriors/posterior_detected_cases_" * date_str * description_str * ".jld2")["detected_cases"]
-    vac_effs = load(
-        "posteriors/posterior_vac_effectivenesses_" * date_str * description_str * ".jld2",
-    )["vac_effectivenesses"]
-    end_states =
-        load("posteriors/posterior_end_states_" * date_str * description_str * ".jld2")["end_states"]
+##
+
+description_strs = ["no_ngbmsm_chg", "", "no_bv_cng"]
+description_labs = ["Main model", "Also non-GBMSM behaviour change", "No behaviour change"]
+clrs = 1:3
+
+errs_by_data = map(1:5) do n
+    proj_weeks = seq_wks[n]
+    start_wk = proj_weeks[end] 
+    plt_gbmsm = plot(;
+                    ylabel = "Weekly cases",
+                    left_margin = 5mm,
+                    right_margin = 5mm,
+                    size = (800, 600),
+                    dpi = 250,
+                    ytickfont = 18,
+                    xtickfont = 12,
+                    titlefont = 20,
+                    guidefont = 24,
+                    legendfont = 12)
+
+    plt_nongbmsm = deepcopy(plt_gbmsm)
+    err_by_model = map((description_str, clr, description_lab) -> load_data_and_make_proj(start_wk, description_str, plt_gbmsm, plt_nongbmsm, clr, description_lab; pheic_effect = n > 1),
+                        description_strs,
+                        clrs,
+                        description_labs)
+
+    scatter!(plt_gbmsm, wks, mpxv_wkly[:,1],
+            lab = "Data available (6th Oct 2022)",
+            ms = 6,
+            color = :black,
+            yerrors = (
+                mpxv_wkly[:, 1] .- lwr_mpxv_wkly[:, 1],
+                upr_mpxv_wkly[:, 1] .- mpxv_wkly[:, 1],
+            ),)                    
+
+    scatter!(plt_nongbmsm, wks, mpxv_wkly[:,2],
+                lab = "Data available (6th Oct 2022)",
+                ms = 6,
+                color = :black,
+                yerrors = (
+                    mpxv_wkly[:, 2] .- lwr_mpxv_wkly[:, 2],
+                    upr_mpxv_wkly[:, 2] .- mpxv_wkly[:, 2],
+                ),)                    
+
+    plt = plot(plt_gbmsm, plt_nongbmsm,
+                size = (1500,600),
+                dpi = 250,
+                left_margin = 10mm,
+                right_margin = 0mm,
+                bottom_margin = 5mm)
+
+    savefig(plt, "plots/proj_plot_" * string(start_wk) * ".png")
     
-    if !pheic_effect
-
-    end
-
-    return (; param_draws, detected_cases, vac_effs, end_states)
+    return err_by_model
 end
 
-
-
-post_draws = load_posteriors_for_projection(string(seq_wks[2][end]), "no_ngbmsm_chg")
-
-cred = cred_intervals(post_draws.detected_cases, central_est = :median)
-
-
 ##
-n_samples = 2000
-
-proj_fromend = [
-    (
-        ts = [seq_wks[1][end] + Week(k) for k = 1:12] .|> d -> (d - Date(2021, 12, 31)).value |> Float64,
-        wkly_vaccinations = wkly_vaccinations[(length(seq_wks[1])+1):end],
-        vac_effectiveness = post_draws.vac_effs[k],
-    ) for k = 1:n_samples
-]
 
 
-##
-projections_from_end = @showprogress 0.1 "MPX Forecasts:" map(
-    (θ, interventions, state) ->
-        mpx_sim_function_projections(θ, constants, interventions, state),
-    post_draws.param_draws,
-    proj_fromend,
-    post_draws.end_states,
-)
-
-cred_proj = MonkeypoxUK.cred_intervals(
-    [proj.detected_cases for proj in projections_from_end],
-    central_est = :median,
-)
-
-d1 = size(cred_proj.median_pred, 1)
-
-plot(seq_wks[1][3:end], cred.median_pred,
-           ribbon = (cred.lb_pred_25, cred.ub_pred_25))
-scatter!(wks, mpxv_wkly)           
-plot!([seq_wks[1][end] + Week(k) for k = 1:12], cred_proj.median_pred,
-        ribbon = (cred_proj.lb_pred_25, cred_proj.ub_pred_25))
 
 ## CHANGE BELOW
-seq_param_draws = map(load_smc, seq_wks)
+seq_param_draws = map(load_smc, seq_wks)    
 
 seq_forecasts = map(
     (param_draws, wks, mpxv_wkly) ->
