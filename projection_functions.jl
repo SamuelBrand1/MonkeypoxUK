@@ -48,9 +48,6 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
         [proj.detected_cases for proj in projections_from_end],
         central_est = :median,
     )
-
-    #Err calculation
-    
     
     plot!(plt_gbmsm, 
             title = "GBMSM case proj. from " * string(start_wk),
@@ -106,6 +103,7 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
 
     f1 = findall([wk ∈ wks for wk in [start_wk + Week(k) for k = 1:12]])
     f2 = findall([wk ∈ [start_wk + Week(k) for k = 1:12] for wk in wks ])
+
     if !isempty(f1)
         errors = [sum(abs, proj_cases.detected_cases[f1,:] .- mpxv_wkly[f2,:]) ./ sum(mpxv_wkly[f2,:])  for proj_cases in projections_from_end]
         err = mean(errors)

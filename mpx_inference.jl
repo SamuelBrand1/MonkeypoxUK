@@ -28,9 +28,25 @@ wks = wks[3:end]
 
 include("setup_model.jl");
 
-## Define priors for the parameters
+## Define different priors for different models
 
-prior_vect_cng_pnt = [
+# Main model
+prior_vect_no_ngbmsm_chg = [
+    Gamma(1,1), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Beta(1.5,1.5),#trans_red 8
+    Uniform(0.0,1e-10),#trans_red_other 9
+    Beta(1.5,1.5),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red_other WHO 11
+]
+
+# Model with only one metapopulation
+prior_vect_one_metapop = [
     Uniform(1e-11,1e-10), # α_choose 1
     Beta(5, 5), #p_detect  2
     Beta(1, 1), #p_trans  3
@@ -43,6 +59,52 @@ prior_vect_cng_pnt = [
     Beta(1.5,1.5),#trans_red WHO  10 
     Uniform(0.0,1e-10),#trans_red_other WHO 11
 ]
+
+# Model with behaviour change for GBMSM and non-GBMSM
+
+prior_vect = [
+    Gamma(1,1), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Beta(1.5,1.5),#trans_red 8
+    Beta(1.5,1.5),#trans_red_other 9
+    Beta(1.5,1.5),#trans_red WHO  10 
+    Beta(1.5,1.5),#trans_red_other WHO 11
+]
+
+# Model with no behaviour change for GBMSM and non-GBMSM
+
+prior_vect_no_bv_cng = [
+    Gamma(1,1), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Uniform(0.0,1e-10),#trans_red 8
+    Uniform(0.0,1e-10),#trans_red_other 9
+    Uniform(0.0,1e-10),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red_other WHO 11
+]
+
+model_str_to_prior = Dict("no_ngbmsm_chg" => prior_vect_no_ngbmsm_chg,
+                            "no_bv_cng" => prior_vect_no_bv_cng,
+                            "one_metapop" => prior_vect_one_metapop,
+                            "" => prior_vect)
+
+## Choose model
+
+# description_str = "no_ngbmsm_chg" #<---- This is the main model
+# description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
+description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
+# description_str = "" #<--- this is the older version main model
+
+prior_vect_cng_pnt = model_str_to_prior[description_str]
 
 
 #Use SBC for defining the ABC error target and generate prior predictive plots
@@ -72,10 +134,6 @@ setup_cng_pnt = ABCSMC(
 ##Run ABC and save results   
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
-# description_str = "no_ngbmsm_chg" #<---- This is the main model
-# description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
-description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
-# description_str = "" #<--- this is the older version main model
 
 @save("posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * ".jld2", smc_cng_pnt) #<--- this can be too large
 ##

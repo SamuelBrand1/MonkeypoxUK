@@ -140,7 +140,7 @@ end
 
 ##
 
-
+errs_by_data[2]
 
 ## CHANGE BELOW
 seq_param_draws = map(load_smc, seq_wks)    
