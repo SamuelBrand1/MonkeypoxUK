@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit4"
+colname = "seqn_fit1"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -22,8 +22,8 @@ mpxv_wkly =
 wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
                                 
 # Leave out first two weeks because reporting changed in early May
-mpxv_wkly = mpxv_wkly[3:end, :]
-wks = wks[3:end]
+mpxv_wkly = mpxv_wkly[3:(end-4), :]
+wks = wks[3:(end-4)]
 ## Set up model
 
 include("setup_model.jl");
