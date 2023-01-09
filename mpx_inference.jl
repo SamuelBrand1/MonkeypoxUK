@@ -99,9 +99,9 @@ model_str_to_prior = Dict("no_ngbmsm_chg" => prior_vect_no_ngbmsm_chg,
 
 ## Choose model
 
-description_str = "no_ngbmsm_chg" #<---- This is the main model
+# description_str = "no_ngbmsm_chg" #<---- This is the main model
 # description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
-# description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
+description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
 # description_str = "" #<--- this is the older version main model
 
 prior_vect_cng_pnt = model_str_to_prior[description_str]
