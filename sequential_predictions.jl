@@ -54,40 +54,29 @@ wkly_vaccinations = [
 
 ## Generate an ensemble of forecasts
 
-seq_wks = [wks[1:8], wks[1:12], wks[1:16], wks[1:20], wks]
+seq_wks = [wks[1:4], wks[1:8], wks[1:12], wks[1:16], wks[1:20]]
 
 seq_mpxv_wklys = [
+    mpxv_wkly[1:4, :],
     mpxv_wkly[1:8, :],
     mpxv_wkly[1:12, :],
     mpxv_wkly[1:16, :],
     mpxv_wkly[1:20, :],
-    mpxv_wkly,
+    # mpxv_wkly,
 ]
 
 ## Include useful functions for projections 
 
 include("projection_functions.jl");
 
-## 
-
-description_str = "no_ngbmsm_chg" #<---- This is the main model
-# description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
-# description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
-# description_str = "no_ngbmsm_chg" #<--- this is the older version main model
-
-proj_weeks = seq_wks[1]
-start_wk = proj_weeks[end] 
-plt1 = plot()
-plt2 = plot()
-err2, err_range2 = load_data_and_make_proj(start_wk, description_str, plt1, plt2, 1, "No behaviour change"; pheic_effect = false)
-
 ##
 
-description_strs = ["no_ngbmsm_chg", "", "no_bv_cng"]
-description_labs = ["Main model", "Also non-GBMSM behaviour change", "No behaviour change"]
-clrs = 1:3
+description_strs = ["no_ngbmsm_chg", "", "no_bv_cng", "one_metapop"]
+description_labs = ["Main model", "Also non-GBMSM behaviour change", "No behaviour change", "Homo. pop."]
+clrs = 1:4
 
 errs_by_data = map(1:5) do n
+    n_vac = (length(seq_wks[n])+1)
     proj_weeks = seq_wks[n]
     start_wk = proj_weeks[end] 
     plt_gbmsm = plot(;
@@ -103,7 +92,7 @@ errs_by_data = map(1:5) do n
                     legendfont = 12)
 
     plt_nongbmsm = deepcopy(plt_gbmsm)
-    err_by_model = map((description_str, clr, description_lab) -> load_data_and_make_proj(start_wk, description_str, plt_gbmsm, plt_nongbmsm, clr, description_lab; pheic_effect = n > 1),
+    err_by_model = map((description_str, clr, description_lab) -> load_data_and_make_proj(start_wk, description_str, plt_gbmsm, plt_nongbmsm, clr, description_lab, n_vac; pheic_effect = n > 2),
                         description_strs,
                         clrs,
                         description_labs)
@@ -140,161 +129,161 @@ end
 
 ##
 
-errs_by_data[2]
+errs_by_data[4]
 
 ## CHANGE BELOW
-seq_param_draws = map(load_smc, seq_wks)    
+# seq_param_draws = map(load_smc, seq_wks)    
 
-seq_forecasts = map(
-    (param_draws, wks, mpxv_wkly) ->
-        generate_forecast_projection(param_draws, wks, mpxv_wkly, constants),
-    seq_param_draws,
-    seq_wks,
-    seq_mpxv_wklys,
-)
-
-
-
-##
-preds = [[x[1] for x in forecast] for forecast in seq_forecasts]
-seq_creds = MonkeypoxUK.cred_intervals.(preds)
-long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
-long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
-
-##
-"""
-function add_seqn_forecast!(plt, n; msm::Bool, N=4)
-
-Add the `n` the sequential prediction curve to the plot.    
-"""
-function add_seqn_forecast!(plt, n; msm::Bool, N = 5)
-    period = (length(seq_wks[n])):(length(seq_wks[n])+11)
-    k = msm ? 1 : 2
-    plot!(
-        plt,
-        long_wks[period],
-        seq_creds[n].mean_pred[period, k],
-        color = get(ColorSchemes.cool, n / N),
-        ribbon = (seq_creds[n].lb_pred_10[period, k], seq_creds[n].ub_pred_10[period, k]),
-        fillalpha = 0.3,
-        legend = :topleft,
-        lab = seq_wks[n][end],
-        lw = 0,
-    )
-
-    plot!(
-        plt,
-        long_wks[period],
-        seq_creds[n].mean_pred[period, k],
-        color = get(ColorSchemes.cool, n / N),
-        lab = "",
-        lw = 3,
-    )
-end
+# seq_forecasts = map(
+#     (param_draws, wks, mpxv_wkly) ->
+#         generate_forecast_projection(param_draws, wks, mpxv_wkly, constants),
+#     seq_param_draws,
+#     seq_wks,
+#     seq_mpxv_wklys,
+# )
 
 
-##
 
-seq_proj_msm = plot(;
-    ylabel = "Weekly cases",
-    title = "UK Monkeypox Sequential Projections (GBMSM)",# yscale=:log10,
-    legend = :topleft,
-    # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
-    # ylims=(0.8, 3001),
-    xticks = (
-        [Date(2022, 5, 1) + Month(k) for k = 0:7],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:7],
-    ),
-    left_margin = 5mm,
-    right_margin = 5mm,
-    size = (800, 600),
-    dpi = 250,
-    tickfont = 18,
-    titlefont = 20,
-    guidefont = 24,
-    legendfont = 12,
-)
+# ##
+# preds = [[x[1] for x in forecast] for forecast in seq_forecasts]
+# seq_creds = MonkeypoxUK.cred_intervals.(preds)
+# long_wks = [wks; [wks[end] + Day(7 * k) for k = 1:12]]
+# long_mpxv_wkly = [mpxv_wkly; zeros(12, 2)]
 
+# ##
+# """
+# function add_seqn_forecast!(plt, n; msm::Bool, N=4)
 
-for n = 1:5
-    add_seqn_forecast!(seq_proj_msm, n; msm = true)
-end
-scatter!(
-    seq_proj_msm,
-    wks[1:(end)],
-    mpxv_wkly[1:(end), 1],
-    lab = "Data available (6th Oct 2022)",
-    ms = 6,
-    color = :black,
-    legend = :topright,
-    yerrors = (
-        mpxv_wkly[:, 1] .- lwr_mpxv_wkly[:, 1],
-        upr_mpxv_wkly[:, 1] .- mpxv_wkly[:, 1],
-    ),
-)
-display(seq_proj_msm)
+# Add the `n` the sequential prediction curve to the plot.    
+# """
+# function add_seqn_forecast!(plt, n; msm::Bool, N = 5)
+#     period = (length(seq_wks[n])):(length(seq_wks[n])+11)
+#     k = msm ? 1 : 2
+#     plot!(
+#         plt,
+#         long_wks[period],
+#         seq_creds[n].mean_pred[period, k],
+#         color = get(ColorSchemes.cool, n / N),
+#         ribbon = (seq_creds[n].lb_pred_10[period, k], seq_creds[n].ub_pred_10[period, k]),
+#         fillalpha = 0.3,
+#         legend = :topleft,
+#         lab = seq_wks[n][end],
+#         lw = 0,
+#     )
 
-##
-
-seq_proj_nmsm = plot(;
-    ylabel = "Weekly cases",
-    title = "UK Monkeypox Sequential Projections (non-GBMSM)",# yscale=:log10,
-    legend = :topleft,
-    # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
-    ylims = (-5, 200),
-    xticks = (
-        [Date(2022, 5, 1) + Month(k) for k = 0:7],
-        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:7],
-    ),
-    left_margin = 5mm,
-    right_margin = 5mm,
-    size = (800, 600),
-    dpi = 250,
-    tickfont = 18,
-    titlefont = 18,
-    guidefont = 24,
-    legendfont = 12,
-)
-
-##
-
-for n = 1:5
-    add_seqn_forecast!(seq_proj_nmsm, n; msm = false)
-end
-scatter!(
-    seq_proj_nmsm,
-    wks[1:(end)],
-    mpxv_wkly[1:(end), 2],
-    lab = "Data available (6th Oct 2022)",
-    ms = 6,
-    color = :black,
-    legend = :topright,
-    yerrors = (
-        mpxv_wkly[:, 2] .- lwr_mpxv_wkly[:, 2],
-        upr_mpxv_wkly[:, 2] .- mpxv_wkly[:, 2],
-    ),
-)
-display(seq_proj_nmsm)
+#     plot!(
+#         plt,
+#         long_wks[period],
+#         seq_creds[n].mean_pred[period, k],
+#         color = get(ColorSchemes.cool, n / N),
+#         lab = "",
+#         lw = 3,
+#     )
+# end
 
 
-##        
+# ##
 
-savefig(seq_proj_msm, "plots/msm_sequential_forecasts.png")
-savefig(seq_proj_nmsm, "plots/nmsm_sequential_forecasts.png")
+# seq_proj_msm = plot(;
+#     ylabel = "Weekly cases",
+#     title = "UK Monkeypox Sequential Projections (GBMSM)",# yscale=:log10,
+#     legend = :topleft,
+#     # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
+#     # ylims=(0.8, 3001),
+#     xticks = (
+#         [Date(2022, 5, 1) + Month(k) for k = 0:7],
+#         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:7],
+#     ),
+#     left_margin = 5mm,
+#     right_margin = 5mm,
+#     size = (800, 600),
+#     dpi = 250,
+#     tickfont = 18,
+#     titlefont = 20,
+#     guidefont = 24,
+#     legendfont = 12,
+# )
 
-##
 
-layout = @layout [a b]
-fig_seqn_proj = plot(
-    seq_proj_msm,
-    seq_proj_nmsm,
-    size = (1750, 800),
-    dpi = 250,
-    left_margin = 10mm,
-    bottom_margin = 10mm,
-    right_margin = 10mm,
-    top_margin = 5mm,
-    layout = layout,
-)
-display(fig_seqn_proj)
-savefig(fig_seqn_proj, "plots/seqn_forecasts.png")
+# for n = 1:5
+#     add_seqn_forecast!(seq_proj_msm, n; msm = true)
+# end
+# scatter!(
+#     seq_proj_msm,
+#     wks[1:(end)],
+#     mpxv_wkly[1:(end), 1],
+#     lab = "Data available (6th Oct 2022)",
+#     ms = 6,
+#     color = :black,
+#     legend = :topright,
+#     yerrors = (
+#         mpxv_wkly[:, 1] .- lwr_mpxv_wkly[:, 1],
+#         upr_mpxv_wkly[:, 1] .- mpxv_wkly[:, 1],
+#     ),
+# )
+# display(seq_proj_msm)
+
+# ##
+
+# seq_proj_nmsm = plot(;
+#     ylabel = "Weekly cases",
+#     title = "UK Monkeypox Sequential Projections (non-GBMSM)",# yscale=:log10,
+#     legend = :topleft,
+#     # yticks=([1, 2, 11, 101, 1001], [0, 1, 10, 100, 1000]),
+#     ylims = (-5, 200),
+#     xticks = (
+#         [Date(2022, 5, 1) + Month(k) for k = 0:7],
+#         [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:7],
+#     ),
+#     left_margin = 5mm,
+#     right_margin = 5mm,
+#     size = (800, 600),
+#     dpi = 250,
+#     tickfont = 18,
+#     titlefont = 18,
+#     guidefont = 24,
+#     legendfont = 12,
+# )
+
+# ##
+
+# for n = 1:5
+#     add_seqn_forecast!(seq_proj_nmsm, n; msm = false)
+# end
+# scatter!(
+#     seq_proj_nmsm,
+#     wks[1:(end)],
+#     mpxv_wkly[1:(end), 2],
+#     lab = "Data available (6th Oct 2022)",
+#     ms = 6,
+#     color = :black,
+#     legend = :topright,
+#     yerrors = (
+#         mpxv_wkly[:, 2] .- lwr_mpxv_wkly[:, 2],
+#         upr_mpxv_wkly[:, 2] .- mpxv_wkly[:, 2],
+#     ),
+# )
+# display(seq_proj_nmsm)
+
+
+# ##        
+
+# savefig(seq_proj_msm, "plots/msm_sequential_forecasts.png")
+# savefig(seq_proj_nmsm, "plots/nmsm_sequential_forecasts.png")
+
+# ##
+
+# layout = @layout [a b]
+# fig_seqn_proj = plot(
+#     seq_proj_msm,
+#     seq_proj_nmsm,
+#     size = (1750, 800),
+#     dpi = 250,
+#     left_margin = 10mm,
+#     bottom_margin = 10mm,
+#     right_margin = 10mm,
+#     top_margin = 5mm,
+#     layout = layout,
+# )
+# display(fig_seqn_proj)
+# savefig(fig_seqn_proj, "plots/seqn_forecasts.png")

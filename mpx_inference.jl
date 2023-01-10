@@ -12,7 +12,7 @@ import MonkeypoxUK
 past_mpxv_data_inferred = CSV.File("data/weekly_data_imputation_2022-09-30.csv",
                                 missingstring = "NA") |> DataFrame
 
-colname = "seqn_fit4"
+colname = "seqn_fit5"
 inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
 mpxv_wkly =
     past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]] .+
@@ -99,9 +99,9 @@ model_str_to_prior = Dict("no_ngbmsm_chg" => prior_vect_no_ngbmsm_chg,
 
 ## Choose model
 
-# description_str = "no_ngbmsm_chg" #<---- This is the main model
+description_str = "no_ngbmsm_chg" #<---- This is the main model
 # description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
-description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
+# description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
 # description_str = "" #<--- this is the older version main model
 
 prior_vect_cng_pnt = model_str_to_prior[description_str]
@@ -150,6 +150,8 @@ susceptibilities = [particle.other.susceptibility for particle in smc_cng_pnt.pa
 @save("posteriors/posterior_susceptibilities_" * string(wks[end]) * description_str * ".jld2", susceptibilities)
 end_states = [particle.other.end_state for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_end_states_" * string(wks[end]) * description_str * ".jld2", end_states)
+start_states = [particle.other.start_state for particle in smc_cng_pnt.particles]
+@save("posteriors/posterior_start_states_" * string(wks[end]) * description_str * ".jld2", start_states)
 begin_vac_states = [particle.other.state_pre_vaccine for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_begin_vac_states_" * string(wks[end]) * description_str * ".jld2", begin_vac_states)
 begin_sept_states = [particle.other.state_sept for particle in smc_cng_pnt.particles]
