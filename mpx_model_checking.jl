@@ -63,8 +63,17 @@ resampled_cases = map(incidences, param_draws) do inc, θ
     return map(n -> rand(BetaBinomial(n, p_detect * M, (1-p_detect) * M)), grouped_incidences)
 end
 
-# above_below = map(cases -> sign.(cases .-  mpxv_wkly[3:end,:]), resampled_cases)
-above_below = map(cases -> sign.(cases .-  mpxv_wkly[3:end,:]), detected_cases)
+"""
+function generate_trans_risk_over_time(
+    p_trans,
+    trans_red,
+    trans_red2,
+    chp,
+    chp2,
+    ts,
+    days_reversion;
+    reversion_time=(Date(2022, 9, 1) - Date(2021, 12, 31)).value
+)
 
 marginal_posteriors = zeros(size(above_below[1]))
 
