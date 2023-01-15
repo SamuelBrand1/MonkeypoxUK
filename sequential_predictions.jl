@@ -129,13 +129,24 @@ end
 
 ##
 df_errors = DataFrame(date = String[], 
-                        main_model = String[],
-                        full_model = String[],
-                        no_behaviour_change = String[],
-                        one_metapopulation = String[])
+                        main_model_mean_error = String[],
+                        full_model_mean_error = String[],
+                        no_behaviour_change_mean_error = String[],
+                        one_metapopulation_mean_error = String[],
+                        main_model_forecast_err = Number[],
+                        full_model_forecast_err = Number[],
+                        no_behaviour_change_forecast_err = Number[],
+                        one_metapopulation_forecast_err = Number[])
 
 for k = 1:4                        
-    push!(df_errors, [string(seq_wks[k][end]);[string(errs_by_data[k][n])[2:(end-1)] for n = 1:4]])                        
+    push!(df_errors, 
+            [string(seq_wks[k][end]);
+            [string(errs_by_data[k][n][1])[2:(end-1)] for n = 1:4];
+            [errs_by_data[k][n][2] for n = 1:4]],
+            )                        
 end
 
 CSV.write("projections/forecast_errors.csv", df_errors)
+
+##
+string(errs_by_data[1][1][1])[2:(end-1)]
