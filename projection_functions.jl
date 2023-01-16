@@ -48,7 +48,16 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
         [proj.detected_cases for proj in projections_from_end],
         central_est = :median,
     )
+
+    cred_prev_cases = MonkeypoxUK.cred_intervals(
+        [proj for proj in post_draws.detected_cases],
+        central_est = :median,
+    )
     
+    n_wks = size(cred_prev_cases.median_pred, 1)
+    past_wks = (start_wk - Week(n_wks-1)):Week(1):(start_wk) |> collect
+    
+
     plot!(plt_gbmsm, 
             title = "GBMSM case proj. from " * string(start_wk),
             legend = :topleft)
@@ -57,28 +66,27 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
         title = "non-GBMSM case proj. from " * string(start_wk),
         legend = :topleft)        
 
+    plot!(plt_gbmsm, past_wks, cred_prev_cases.median_pred[:,1],
+        lab = "",
+        c= clr,
+        lw = 2,
+        ls = :dot,
+        )
+
     plot!(plt_gbmsm, [start_wk + Week(k) for k = 1:12], cred_proj.median_pred[:,1],
            ribbon = (cred_proj.lb_pred_25[:,1], cred_proj.ub_pred_25[:,1]),
            lab = lab_str,
            c= clr,
            lw = 3,
            fillalpha = 0.2) 
-           
-    # plot!(plt_gbmsm, [start_wk + Week(k) for k = 1:12], cred_proj.median_pred[:,1],
-    #        ribbon = (cred_proj.lb_pred_10[:,1], cred_proj.ub_pred_10[:,1]),
-    #        lab = "",
-    #        c= clr,
-    #        lw = 0,
-    #        fillalpha = 0.2)
 
-    # plot!(plt_gbmsm, [start_wk + Week(k) for k = 1:12], cred_proj.median_pred[:,1],
-    #        ribbon = (cred_proj.lb_pred_025[:,1], cred_proj.ub_pred_025[:,1]),
-    #        lab = "",
-    #        c = clr,
-    #        lw = 0,
-    #        fillalpha = 0.2)
-
-    
+    plot!(plt_nongbmsm, past_wks, cred_prev_cases.median_pred[:,2],
+           lab = "",
+           c= clr,
+           lw = 2,
+           ls = :dot,
+           )
+   
 
     plot!(plt_nongbmsm, [start_wk + Week(k) for k = 1:12], cred_proj.median_pred[:,2],
             ribbon = (cred_proj.lb_pred_25[:,2], cred_proj.ub_pred_25[:,2]),
@@ -87,31 +95,20 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
             lw = 3,
             fillalpha = 0.2) 
             
-    # plot!(plt_nongbmsm, [start_wk + Week(k) for k = 1:12], cred_proj.median_pred[:,2],
-    #         ribbon = (cred_proj.lb_pred_10[:,2], cred_proj.ub_pred_10[:,2]),
-    #         lab = "",
-    #         c= clr,
-    #         lw = 0,
-    #         fillalpha = 0.2)
-
-    # plot!(plt_nongbmsm, [start_wk + Week(k) for k = 1:12], cred_proj.median_pred[:,2],
-    #         ribbon = (cred_proj.lb_pred_025[:,2], cred_proj.ub_pred_025[:,2]),
-    #         lab = "",
-    #         c = clr,
-    #         lw = 0,
-    #         fillalpha = 0.2)   
-
     f1 = findall([wk ∈ wks for wk in [start_wk + Week(k) for k = 1:12]])
     f2 = findall([wk ∈ [start_wk + Week(k) for k = 1:12] for wk in wks ])
+
 
     if !isempty(f1)
         errors = [sum(abs, proj_cases.detected_cases[f1,:] .- mpxv_wkly[f2,:]) ./ sum(mpxv_wkly[f2,:])  for proj_cases in projections_from_end]
         err = mean(errors)
         err_range = quantile(errors, [0.025, 0.975])
-        return err, err_range    
+        median_forecast_err = sum(abs, cred_proj.median_pred[f1, :] .- mpxv_wkly[f2,:])  ./ sum(mpxv_wkly[f2,:])
+        return (err, err_range), median_forecast_err   
     else
-        return 0.0, [0.0,0.0]
+        return (0.0, [0.0,0.0]), 0.0
     end
+    
 end
 
 function load_data_and_make_proj(start_wk, description_str, plt_gbmsm, plt_nongbmsm, clr, lab_str, n_vac ; n_samples = 2000, pheic_effect = true)
