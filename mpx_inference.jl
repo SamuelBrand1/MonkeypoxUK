@@ -138,9 +138,6 @@ setup_cng_pnt = ABCSMC(
 
 smc_cng_pnt = runabc(setup_cng_pnt, mpxv_wkly, verbose = true, progress = true)
 
-@save("posteriors/smc_posterior_draws_" * string(wks[end]) * description_str * ".jld2", smc_cng_pnt) #<--- this can be too large
-##
-
 param_draws = [particle.params for particle in smc_cng_pnt.particles]
 @save("posteriors/posterior_param_draws_" * string(wks[end]) * description_str * ".jld2", param_draws)
 detected_cases = [particle.other.detected_cases for particle in smc_cng_pnt.particles]

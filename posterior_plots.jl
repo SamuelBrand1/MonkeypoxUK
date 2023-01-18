@@ -25,31 +25,121 @@ wks = wks[3:end]
 
 include("setup_model.jl");
 
-## Comment out to use latest data rather than reterospective data
+##Load posterior draws and structure
+# Main model
 
-colname = "seqn_fit5"
-inferred_prop_na_msm = past_mpxv_data_inferred[:, colname] |> x -> x[.~ismissing.(x)]
-mpxv_wkly =
-    Matrix(
-        past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), ["gbmsm", "nongbmsm"]],
-    ) .+
-    Vector(past_mpxv_data_inferred[1:size(inferred_prop_na_msm, 1), "na_gbmsm"]) .*
-    hcat(inferred_prop_na_msm, 1.0 .- inferred_prop_na_msm)
-wks = Date.(past_mpxv_data_inferred.week[1:size(mpxv_wkly, 1)], DateFormat("dd/mm/yyyy"))
+param_names = [
+    :metapop_size_dispersion,
+    :prob_detect,
+    :prob_transmission,
+    :R0_other,
+    :detect_dispersion,
+    :init_infs,
+    :chg_pnt,
+    :sex_trans_red,
+    :other_trans_red,
+    :sex_trans_red_post_WHO,
+    :other_trans_red_post_WHO,
+]
 
+transformations = [
+    fill(x -> x, 4)
+    x -> 1 / (x + 1) #Translate "effective sample size" for Beta-Binomial on sampling to overdispersion parameter
+    fill(x -> x, 4)
+    fill(x -> x, 2)
+]
+
+function col_transformations(X, f_vect)
+    for j = 1:size(X, 2)
+        X[:, j] = f_vect[j].(X[:, j])
+    end
+    return X
+end
+
+prior_vect_no_ngbmsm_chg = [
+    Gamma(1,1), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Beta(1.5,1.5),#trans_red 8
+    Uniform(0.0,1e-10),#trans_red_other 9
+    Beta(1.5,1.5),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red_other WHO 11
+]
+
+param_idxs_no_ngbmsm_chg = [trues(7);true;false;true;false]
+
+# Model with only one metapopulation
+prior_vect_one_metapop = [
+    Uniform(1e-11,1e-10), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Beta(1.5,1.5),#trans_red 8
+    Uniform(0.0,1e-10),#trans_red_other 9
+    Beta(1.5,1.5),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red_other WHO 11
+]
+
+param_idxs_one_metapop = [false;trues(6);true;false;true;false]
+
+# Model with behaviour change for GBMSM and non-GBMSM
+
+prior_vect = [
+    Gamma(1,1), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Beta(1.5,1.5),#trans_red 8
+    Beta(1.5,1.5),#trans_red_other 9
+    Beta(1.5,1.5),#trans_red WHO  10 
+    Beta(1.5,1.5),#trans_red_other WHO 11
+]
+
+param_idxs = trues(11)
+
+# Model with no behaviour change for GBMSM and non-GBMSM
+
+prior_vect_no_bv_cng = [
+    Gamma(1,1), # α_choose 1
+    Beta(5, 5), #p_detect  2
+    Beta(1, 1), #p_trans  3
+    LogNormal(log(0.25), 1), #R0_other 4
+    Gamma(3, 1000 / 3),#  M 5
+    LogNormal(log(5), 1),#init_scale 6
+    Uniform(135, 199),# chp_t 7
+    Uniform(0.0,1e-10),#trans_red 8
+    Uniform(0.0,1e-10),#trans_red_other 9
+    Uniform(0.0,1e-10),#trans_red WHO  10 
+    Uniform(0.0,1e-10),#trans_red_other WHO 11
+]
+
+param_idxs_no_bv_cng = [trues(7);falses(4)]
+
+model_str_to_prior = Dict("no_ngbmsm_chg" => (prior_vect_no_ngbmsm_chg, param_idxs_no_ngbmsm_chg),
+                            "no_bv_cng" => (prior_vect_no_bv_cng, param_idxs_no_bv_cng),
+                            "one_metapop" => (prior_vect_one_metapop, param_idxs_one_metapop),
+                            "" => (prior_vect, param_idxs))
 
 ##Load posterior draws and structure
 
 date_str = "2022-09-26"
-description_str = "no_bv_cng"
-# description_str = "no_ngbmsm_chg"
-# description_str = "one_metapop"
 
-smc = MonkeypoxUK.load_smc(
-    "posteriors/smc_posterior_draws_" * date_str * description_str * ".jld2",
-)
-# param_draws = load("posteriors/posterior_param_draws_2022-09-26_noR_ngbmsm.jld2")["param_draws"]
-param_draws = [particle.params for particle in smc.particles]
+description_str = "no_ngbmsm_chg" #<---- This is the main model
+# description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
+# description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
+# description_str = "" #<--- this is the older version main model
+
+param_draws = load("posteriors/posterior_param_draws_" * date_str * description_str * ".jld2")["param_draws"]
 
 ## Create size distribution plot for the meta population sizes
 n_metapop = 50
@@ -91,130 +181,21 @@ plt_grp_size = bar(
     right_margin = 5mm,
 )
 display(plt_grp_size)
-savefig(plt_grp_size, "plots/clique_size.png")
+savefig(plt_grp_size, "plots/metapopulation_sizes.png")
 ##Create transformations to more interpetable parameters
-param_names = [
-    :metapop_size_dispersion,
-    :prob_detect,
-    :prob_transmission,
-    :R0_other,
-    :detect_dispersion,
-    :init_infs,
-    :chg_pnt,
-    :sex_trans_red,
-    :other_trans_red,
-    :sex_trans_red_post_WHO,
-    :other_trans_red_post_WHO,
-]
-
-transformations = [
-    fill(x -> x, 4)
-    x -> 1 / (x + 1) #Translate "effective sample size" for Beta-Binomial on sampling to overdispersion parameter
-    fill(x -> x, 4)
-    fill(x -> x, 2)
-]
-function col_transformations(X, f_vect)
-    for j = 1:size(X, 2)
-        X[:, j] = f_vect[j].(X[:, j])
-    end
-    return X
-end
-
-param_mat = [p[j] for p in param_draws, j = 1:length(param_names)]
-# val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> hcat(X[:,1:10],X[:,11].*X[:,4],X[:,12].*X[:,5])  |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
-# val_mat = smc.parameters |> X -> col_transformations(X, transformations) |> X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
+all_priors, idxs = model_str_to_prior[description_str]
+priors = all_priors[idxs]
+param_mat = [p[j] for p in param_draws, j = findall(idxs)]
+names = param_names[idxs]
 val_mat =
     param_mat |>
     X ->
         col_transformations(X, transformations) |>
         X -> [X[i, j] for i = 1:size(X, 1), j = 1:size(X, 2), k = 1:1]
-chn = Chains(val_mat, param_names)
+chn = Chains(val_mat, names)
 
-CSV.write("posteriors/posterior_chain_" * string(wks[end]) * ".csv", DataFrame(chn))
+CSV.write("posteriors/posterior_chain_" * date_str * description_str * ".csv", DataFrame(chn))
 
-##Calculate orignal R₀ and latest R(t)
-"""
-function construct_next_gen_mat(params, constants, susceptible_prop, vac_rates; vac_eff::Union{Nothing,Number} = nothing)
-
-Construct the next generation matrix `G` in orientation: 
-> `G_ij = E[# Infected people in group j due to one in group i]`
-Returns `(Real(eigvals(G)[end]), G)`. NB: `Real(eigvals(G)[end])` is the leading eignvalue of `G` i.e. the reproductive number.
-"""
-function construct_next_gen_mat(
-    params,
-    constants,
-    susceptible_prop,
-    vac_rates;
-    vac_eff::Union{Nothing,Number} = nothing,
-)
-    #Get parameters 
-    α_choose,
-    p_detect,
-    p_trans,
-    R0_other,
-    M,
-    init_scale,
-    chp_t,
-    trans_red,
-    trans_red_other,
-    trans_red2,
-    trans_red_other2 = params
-
-    #Get constant data
-    N_total,
-    N_msm,
-    ps,
-    ms,
-    ingroup,
-    ts,
-    α_incubation,
-    γ_eff,
-    epsilon,
-    n_cliques,
-    wkly_vaccinations,
-    vac_effectiveness,
-    chp_t2,
-    weeks_to_change = constants
-
-
-    if ~isnothing(vac_eff)
-        vac_effectiveness = vac_eff
-    end
-    mean_inf_period = epsilon * (1 / (1 - exp(-α_incubation))) + (1 / (1 - exp(-γ_eff)))
-
-    #Calculate next gen matrix G_ij = E[#Infections in group j due to a single infected person in group i]
-    _A =
-        (ms .* (susceptible_prop .+ (vac_rates .* (1.0 .- vac_effectiveness)))') .*
-        (mean_inf_period .* p_trans ./ length(ms))  #Sexual transmission within MSM
-    A = _A .+ (R0_other / N_uk) .* repeat(ps' .* N_msm, 10) #Other routes of transmission MSM -> MSM
-    B = (R0_other * (N_uk - N_msm) / N_total) .* ones(10) # MSM transmission to non MSM
-    C = (R0_other / N_uk) .* ps' .* N_msm  #Non-msm transmission to MSM
-    D = [(R0_other * (N_uk - N_msm) / N_total)]# Non-MSM transmission to non-MSM
-    G = [A B; C D]
-    return Real(eigvals(G)[end]), G
-end
-
-## Calculate the original R0 with next gen matrix method and lastest R(t)
-R0s = map(
-    θ -> construct_next_gen_mat(
-        θ,
-        constants,
-        [ones(10); zeros(0)],
-        [zeros(10); fill(1.0, 0)],
-    )[1],
-    param_draws,
-)
-@show round(mean(R0s), digits = 2), round.(quantile(R0s, [0.1, 0.9]), digits = 2)
-
-##
-prior_tuple = smc.setup.prior.distribution
-prior_val_mat = Matrix{Float64}(undef, 10_000, length(prior_tuple))
-for j = 1:length(prior_tuple)
-    prior_val_mat[:, j] .= rand(prior_tuple[j], 10_000)
-end
-prior_val_mat = col_transformations(prior_val_mat, transformations)
-# prior_val_mat[:,11] .= prior_val_mat[:,11].*prior_val_mat[:,4]
-# prior_val_mat[:,12] .= prior_val_mat[:,12].*prior_val_mat[:,5]
 ##
 pretty_parameter_names = [
     "Metapop. size dispersion",
@@ -229,46 +210,45 @@ pretty_parameter_names = [
     "Sex. trans. reduction: WHO cng pnt",
     "Other. trans. reduction: WHO cng pnt",
 ]
+pretty_names = pretty_parameter_names[idxs]
+
+detection_dispersion_prior_draws = rand(priors[5], 10_000) .|> x -> 1 / (x + 1)
 
 post_plt = plot(;
-    layout = (6, 2),
-    size = (800, 2000),
+    layout = (3, 3),
+    size = (1500, 1500),
     dpi = 250,
     left_margin = 10mm,
     right_margin = 10mm,
 )
 
-for j = 1:length(prior_tuple)
+for (j, prior) in enumerate(priors)
     histogram!(
         post_plt[j],
-        val_mat[:, j],
+        val_mat[:, j, 1][:],
         norm = :pdf,
-        fillalpha = 0.5,
+        fillalpha = 0.3,
         nbins = 100,
         lw = 0.5,
         alpha = 0.1,
         lab = "",
         color = 1,
-        title = string(pretty_parameter_names[j]),
-    )
-    histogram!(
-        post_plt[j],
-        prior_val_mat[:, j],
-        norm = :pdf,
-        fillalpha = 0.5,
-        alpha = 0.1,
-        color = 2,
-        nbins = 100,
-        lab = "",
+        title = string(pretty_names[j]),
     )
     density!(post_plt[j], val_mat[:, j], lw = 3, color = 1, lab = "Posterior")
-    density!(post_plt[j], prior_val_mat[:, j], lw = 3, color = 2, lab = "Prior")
+    if j != 5
+        plot!(post_plt[j], prior, lw = 3, color = 2, lab = "Prior")
+    else        
+        density!(post_plt[j], detection_dispersion_prior_draws, lw = 3, color = 2, lab = "Prior")
+    end
+    
 end
+# plot!(post_plt[10], yaxis = nothing, xaxis = nothing, grid = nothing, ticks = nothing, showaxis = false )
 display(post_plt)
-savefig(post_plt, "posteriors/post_plot" * string(wks[end]) * ".png")
+savefig(post_plt, "plots/post_plot" * date_str * description_str * ".png")
 
 ##
 crn_plt = corner(chn, size = (2000, 2000), left_margin = 5mm, right_margin = 5mm)
-savefig(crn_plt, "posteriors/post_crnplot" * string(wks[end]) * ".pdf")
+savefig(crn_plt, "plots/post_crnplot" * date_str * description_str  * ".pdf")
 
 ##

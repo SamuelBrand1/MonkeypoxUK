@@ -1,0 +1,27 @@
+\newcommand{\Rotherfit}{0.0378 (0.0116 - 0.0659}
+\newcommand{\probtransmissionfit}{44.3\% (25.8 - 76.7\%}
+\newcommand{\posteriortable}{\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}clll@{\extracolsep{\fill}}}
+\hline
+Parameter & \multicolumn{1}{c}{\begin{tabular}[c]{@{}c@{}}Posterior mean\\ (95\% CI)\end{tabular}} & \multicolumn{1}{c}{Prior distribution} & \multicolumn{1}{c}{Description} \\ 
+\hline
+\multicolumn{4}{c}{Population structure and initial condition parameters} \\ \hline
+$\alpha_m$ & 2.33 (0.326, 5.81)& $Exp(1)$ & \begin{tabular}[c]{@{}l@{}}Dispersion parameter for\\ metapopulation sizes.\end{tabular}  \\ 
+\hline
+$\iota_0$  & 5.63 (1.01, 12.8)& $LogNormal(\ln(5), 1)$  & \begin{tabular}[c]{@{}l@{}}Scale parameter for\\ the number of initial\\ infected people.\end{tabular}\\ 
+\hline
+\multicolumn{4}{c}{Detection probability parameters} \\ \hline
+$p_d$  & 0.434 (0.171, 0.844)& $Beta(5,5)$ & \begin{tabular}[c]{@{}l@{}}Mean weekly probability\\ of case detection.\\ Weekly probability of\\ detection was random\\ with $P_w \sim Beta(\alpha,\beta)$\\ with $\mathbb{E}[P_w]=p_d$.\end{tabular}  \\ \hline
+$\Phi_d=\frac{1}{M+1}$ & 0.00156 (0.000308, 0.00712)& $M \sim Gamma(3,1000/3)$  & \begin{tabular}[c]{@{}l@{}}Dispersion of weekly\\ probability of case\\ detection (M is the\\ effective sample size\\ $\alpha + \beta$ for the weekly\\ $P_w \sim Beta(\alpha,\beta)$\\ distributed probability\\ of case detection).\end{tabular} \\ \hline
+\multicolumn{4}{c}{Baseline transmission parameters}  \\ \hline
+$p_{gbmsm}(0)$ & 0.443 (0.258, 0.767)& $Uniform(0,1)$  & \begin{tabular}[c]{@{}l@{}}Baseline probability\\ of transmission per\\ sexual contact.\end{tabular}\\ \hline
+$R_{other}(0)$  & 0.0378 (0.0116, 0.0659)& $LogNormal(\ln(0.25),1)$ & \begin{tabular}[c]{@{}l@{}}Baseline reproductive\\ number non-GBMSM\\ sexual contacts.\end{tabular} \\ \hline
+\multicolumn{4}{c}{Behaviour and risk change point parameters}  \\ \hline
+$T_1$ & \begin{tabular}[c]{@{}l@{}}11-June\\(19-May, 12-July)\end{tabular}  & $U$(15 May, 18 July) & \begin{tabular}[c]{@{}l@{}}Change point time for\\ reduction in transmission\\ due to awareness of MPX.\end{tabular} \\ \hline
+$\rho_{gbmsm,1}$  & 0.396 (0.108, 0.655)& $Beta(1.5,1.5)$ & \begin{tabular}[c]{@{}l@{}}Reduction in GBMSM\\ reproduction number after\\ change point at $T_1$.\end{tabular} \\ \hline
+$\rho_{gbmsm,2}$ & 0.309 (0.0473, 0.557) & \begin{tabular}[c]{@{}l@{}}$\rho_{gbmsm,2} \sim Beta(1.5,1.5)$\end{tabular} & \begin{tabular}[c]{@{}l@{}}Further reduction in GBMSM\\ reproduction number after\\ WHO announcement of\\ PHEIC.\end{tabular}  \\ \hline
+\end{tabular*}}
+\newcommand{\gbmsmR}{5.28 (3.07 - 9.12}
+\newcommand{\efftransmissionperiod}{6.01}
+\newcommand{\gbmsmRredbv}{3.03 (2.01 - 4.26}
+\newcommand{\gbmsmRredwho}{2.09 (1.26 - 3.48}
+\newcommand{\reduction1}{39.6\%}\n\newcommand{\totalR}{5.28 (3.07 - 9.12}

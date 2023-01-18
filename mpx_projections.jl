@@ -51,7 +51,7 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 
 ## Load posterior draws and saved trajectiories
 
-date_str = "2022-09-26"
+date_str = "2022-09-12"
 description_str = "no_ngbmsm_chg" #<---- This is the main model
 # description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
 # description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
@@ -294,6 +294,26 @@ cum_cred_int_4wk_no_vacs = MonkeypoxUK.cred_intervals(
 cum_cred_infs =
     MonkeypoxUK.matrix_cred_intervals(cumsum.(incidences, dims = 1), central_est = :median)
 
+gbmsm_prop_infs = [sum(inc[:,1:10], dims = 2) for inc in incidences]
+nongbmsm_total_infs = [inc[:,[11]] for inc in incidences]
+cum_cred_total_gbmsm_infs =
+    MonkeypoxUK.matrix_cred_intervals(cumsum.(gbmsm_total_infs, dims = 1)./N_msm, central_est = :median)
+
+cum_cred_total_nongbmsm_infs =
+    MonkeypoxUK.matrix_cred_intervals(cumsum.(nongbmsm_total_infs, dims = 1)./(N_uk-N_msm), central_est = :median)
+        
+
+## Output quantities reported in paper to LaTeX
+median_pred_total_gbmsm = cum_cred_total_gbmsm_infs.median_pred[end] * 100 |> x -> round(x, sigdigits = 3)
+qs_pred_total_gbmsm = (cum_cred_total_gbmsm_infs.lb_pred_025[end] * 100 |> x -> round(x, sigdigits = 3), cum_cred_total_gbmsm_infs.ub_pred_025[end] * 100 |> x -> round(x, sigdigits = 3))
+median_pred_total_nongbmsm = cum_cred_total_nongbmsm_infs.median_pred[end] * 100 |> x -> round(x, sigdigits = 3)
+qs_pred_total_nongbmsm = (cum_cred_total_nongbmsm_infs.lb_pred_025[end] * 100 |> x -> round(x, sigdigits = 3), cum_cred_total_nongbmsm_infs.ub_pred_025[end] * 100 |> x -> round(x, sigdigits = 3))
+
+
+
+case_output = ""
+case_output = case_output * raw"\newcommand{\totalgbmsminf}{" * "$(median_pred_total_gbmsm)" * raw"%" * " ($(qs_pred_total_gbmsm[1]) - $(qs_pred_total_gbmsm[2])}\n"  
+case_output = case_output * raw"\newcommand{\totalnongbmsminf}{" * "$(median_pred_total_nongbmsm)" * raw"%" * " ($(qs_pred_total_nongbmsm[1]) - $(qs_pred_total_nongbmsm[2])}\n"  
 
 
 ## MSM projections
@@ -470,7 +490,6 @@ scatter!(
 )
 
 
-# CSV.write("projections/gbmsm_case_projections" * string(wks[end]) * ".csv", gbmsm_case_projections)
 display(plt_msm)
 
 ##
@@ -495,7 +514,7 @@ plt_nmsm = plot(;
 
 plot!(
     plt_nmsm,
-    wks[3:end],
+    wks[3:size(cred_int.median_pred, 1)+2],
     cred_int.median_pred[:, 2],
     ribbon = (cred_int.lb_pred_25[:, 2], cred_int.ub_pred_25[:, 2]),
     lw = 3,
@@ -506,7 +525,7 @@ plot!(
 
 plot!(
     plt_nmsm,
-    wks[3:end],
+    wks[3:size(cred_int.median_pred, 1)+2],
     cred_int.median_pred[:, 2],
     ribbon = (cred_int.lb_pred_10[:, 2], cred_int.ub_pred_10[:, 2]),
     lw = 0,
@@ -517,7 +536,7 @@ plot!(
 
 plot!(
     plt_nmsm,
-    wks[3:end],
+    wks[3:size(cred_int.median_pred, 1)+2],
     cred_int.median_pred[:, 2],
     ribbon = (cred_int.lb_pred_025[:, 2], cred_int.ub_pred_025[:, 2]),
     lw = 0,
@@ -1358,9 +1377,9 @@ prop_inf = [
     cum_cred_infs.median_pred[end, 11] / (N_uk - N_msm)
     cum_cred_infs.median_pred[end, 1:10] ./ N_msm_grp[:]
 ]
-# 100 * cuminf_cred_int_overall.mean_pred[f] / N_msm
-# 100 * (cuminf_cred_int_overall.mean_pred[f] - cuminf_cred_int_overall.lb_pred_10[f]) / N_msm
-# 100 * (cuminf_cred_int_overall.mean_pred[f] + cuminf_cred_int_overall.ub_pred_10[f]) / N_msm
+
+
+case_output = case_output * raw"\newcommand{propinfgbmsm}{"
 
 mnthly_cnts =
     xs ./ 12 .|>
@@ -1465,3 +1484,6 @@ fig2 = plot(
 display(fig2)
 savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".png")
 savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".svg")
+
+## Save LaTeX output
+
