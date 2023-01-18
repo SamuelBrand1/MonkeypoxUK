@@ -1,0 +1,28 @@
+\newcommand{\constparamtable}{\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}clll@{\extracolsep{\fill}}}
+\hline
+Parameter   & \multicolumn{1}{c}{Fixed value}  & \multicolumn{1}{c}{Description} \\ 
+\hline
+\begin{tabular}[c]{@{}l@{}} Mean \\ generation time.\end{tabular} & 9.25 days & \begin{tabular}[c]{@{}l@{}}Mean time to \\ secondary infections \cite{ward2022transmission}.\end{tabular} \\ 
+\hline
+\begin{tabular}[c]{@{}l@{}} Mean \\ incubation time.\end{tabular} & 7.75 days & \begin{tabular}[c]{@{}l@{}}Mean time from \\ infection to symptoms \cite{ward2022transmission}.\end{tabular} \\ 
+\hline
+$p_{inc}$ &0.258 & \begin{tabular}[c]{@{}l@{}} Daily probability \\ of latency progression (fitted).\end{tabular} \\ 
+\hline
+$\epsilon & 0.776 & \begin{tabular}[c]{@{}l@{}} Relative infectiousness of\\ of pre-symptomatic infected \\ (fitted to 50\% pre-symptomatic infections \\ with fixed mean generation time).\end{tabular} \\
+\hline
+$p_{inf}$ & 0.333 & \begin{tabular}[c]{@{}l@{}} Daily probability of \\ progression from symptomatic infectious (fitted).\end{tabular} \\
+\hline
+\begin{tabular}[c]{@{}l@{}} Effective \\ infectious period.\end{tabular} & 6.01 days & \begin{tabular}[c]{@{}l@{}} Effective infectious duration.\end{tabular} \\
+\hline
+$N$ & 67.2 millions& \begin{tabular}[c]{@{}l@{}} Population size of United Kingdom.\end{tabular} \\
+\hline
+$N_{gbmsm}$ & 761.0 thousands& \begin{tabular}[c]{@{}l@{}} GBMSM population size \\ of United Kingdom \cite{Whittles2019,Sexual-orientation}.\end{tabular} \\
+\hline
+$f(k) \sim k^{-\alpha}$ & $\alpha = $ 1.81& \begin{tabular}[c]{@{}l@{}} Power-law distribution for rate of new \\ sexual contacts for GBMSM people \cite{Whittles2019}.\end{tabular} \\
+\hline
+$v_\mathrm{eff}$ & $\mathcal{U}(0.7,0.85)$ & \begin{tabular}[c]{@{}l@{}} Reduction in susceptibility of vaccinated people \\ assumed to be lower than fully vaccinated estimate \\ of 85\% \cite{Fine1988,Jezek1988}.\end{tabular} \\
+\hline
+$T_2$ & 23rd July & \begin{tabular}[c]{@{}l@{}} Date of WHO announcement that \\ Mpox is a public health emergency of international \\ concern (PHEIC) \cite{who-director-general-declares} \end{tabular} \\
+\hline
+$T_r$ & 15th Sept or 13th Oct & \begin{tabular}[c]{@{}l@{}} Mid-point times for reversion to \\ baseline behaviour (scenarios).  \end{tabular} \\
+\hline\end{tabular*}}
