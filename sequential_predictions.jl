@@ -4,6 +4,7 @@ using OrdinaryDiffEq, ApproxBayes, DataFrames
 using JLD2, MCMCChains, ProgressMeter
 using MonkeypoxUK
 using ColorSchemes, Dates
+using Latexify
 
 ## MSM data with data inference
 
@@ -81,6 +82,7 @@ errs_by_data = map(1:5) do n
     start_wk = proj_weeks[end] 
     plt_gbmsm = plot(;
                     ylabel = "Weekly cases",
+                    legend = :topright,
                     left_margin = 5mm,
                     right_margin = 5mm,
                     size = (800, 600),
@@ -91,7 +93,14 @@ errs_by_data = map(1:5) do n
                     guidefont = 24,
                     legendfont = 12)
 
+
     plt_nongbmsm = deepcopy(plt_gbmsm)
+
+    if n >= 4
+        plot!(plt_gbmsm; ylims = (0,650))
+        plot!(plt_nongbmsm; ylims = (0,65))
+    end
+
     err_by_model = map((description_str, clr, description_lab) -> load_data_and_make_proj(start_wk, description_str, plt_gbmsm, plt_nongbmsm, clr, description_lab, n_vac; pheic_effect = n > 2),
                         description_strs,
                         clrs,
@@ -127,12 +136,17 @@ errs_by_data = map(1:5) do n
     return err_by_model
 end
 
+## Past fits
+
+
+
 ##
+
 df_errors = DataFrame(date = String[], 
-                        main_model_mean_error = String[],
-                        full_model_mean_error = String[],
-                        no_behaviour_change_mean_error = String[],
-                        one_metapopulation_mean_error = String[],
+                        main_model_median_error = String[],
+                        full_model_median_error = String[],
+                        no_behaviour_change_median_error = String[],
+                        one_metapopulation_median_error = String[],
                         main_model_forecast_err = Number[],
                         full_model_forecast_err = Number[],
                         no_behaviour_change_forecast_err = Number[],
@@ -147,6 +161,10 @@ for k = 1:4
 end
 
 CSV.write("projections/forecast_errors.csv", df_errors)
+# project_errors_tex = latexify(df_errors, env = :table)
 
-##
-string(errs_by_data[1][1][1])[2:(end-1)]
+# output_tex = raw"\newcommand{\projectiontable}{" * project_errors_tex * raw"}"
+
+# open("model_output.tex"; append = true) do io
+#     write(io, output_tex)
+# end;

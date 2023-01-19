@@ -8,6 +8,7 @@ using Roots, ApproxBayes, MCMCChains, JLD2, Dates
 export mpx_sim_function_interventions,
     mpx_sim_function_chp,
     mpx_sim_function_projections,
+    mpx_sim_function_projections_uniform_vaccination,
     generate_forecast_projection,
     generate_scenario_projections,
     cred_intervals,
