@@ -60,11 +60,11 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
 
     plot!(plt_gbmsm, 
             title = "GBMSM case proj. from " * string(start_wk),
-            legend = :topleft)
+            )
 
     plot!(plt_nongbmsm,
         title = "non-GBMSM case proj. from " * string(start_wk),
-        legend = :topleft)        
+        )        
 
     plot!(plt_gbmsm, past_wks, cred_prev_cases.median_pred[:,1],
         lab = "",
@@ -96,17 +96,17 @@ function add_proj_plot(plt_gbmsm, plt_nongbmsm, post_draws, start_wk, clr, lab_s
             fillalpha = 0.2) 
             
     f1 = findall([wk ∈ wks for wk in [start_wk + Week(k) for k = 1:12]])
-    f2 = findall([wk ∈ [start_wk + Week(k) for k = 1:12] for wk in wks ])
+    f2 = findall([wk ∈ [start_wk + Week(k) for k = 1:12] for wk in wks])
 
 
     if !isempty(f1)
         errors = [sum(abs, proj_cases.detected_cases[f1,:] .- mpxv_wkly[f2,:]) ./ sum(mpxv_wkly[f2,:])  for proj_cases in projections_from_end]
-        err = mean(errors)
+        err = median(errors)
         err_range = quantile(errors, [0.025, 0.975])
         median_forecast_err = sum(abs, cred_proj.median_pred[f1, :] .- mpxv_wkly[f2,:])  ./ sum(mpxv_wkly[f2,:])
         return (err, err_range), median_forecast_err   
     else
-        return (0.0, [0.0,0.0]), 0.0
+        return (0.0, (0.0,0.0)), 0.0
     end
     
 end

@@ -279,7 +279,7 @@ output = output * raw"\newcommand{\gbmsmR}{" * "$(mean_R_gbmsm) ($(qs_R_gbmsm[1]
 output = output * raw"\newcommand{\efftransmissionperiod}{" * "$(round(eff_infectious_period, sigdigits = 3))}\n"
 output = output * raw"\newcommand{\gbmsmRredbv}{" * "$(mean_R_gbmsm_red1) ($(qs_R_gbmsm_red1[1]) - $(qs_R_gbmsm_red1[2])}\n"
 output = output * raw"\newcommand{\gbmsmRredwho}{" * "$(mean_R_gbmsm_red2) ($(qs_R_gbmsm_red2[1]) - $(qs_R_gbmsm_red2[2])}\n"
-output = output * raw"\newcommand{\reduction1}{" * string(mean_red_1) * raw"\%}\n"
+output = output * raw"\newcommand{\reductionone}{" * string(mean_red_1) * raw"\%}\n"
 
 ##Calculate orignal R₀ and latest R(t)
 """

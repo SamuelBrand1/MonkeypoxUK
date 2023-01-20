@@ -199,9 +199,9 @@ CSV.write("posteriors/posterior_chain_" * date_str * description_str * ".csv", D
 ##
 pretty_parameter_names = [
     "Metapop. size dispersion",
-    "Prob. of detection",
+    "Prob. of case detection",
     "Prob. trans. per sexual contact",
-    "Non-sexual R0",
+    "Other R0",
     "Prob. of detect. dispersion",
     "Init. Infs scale",
     "Timing: 1st change point",
@@ -234,6 +234,8 @@ for (j, prior) in enumerate(priors)
         lab = "",
         color = 1,
         title = string(pretty_names[j]),
+        titlefont = 18,
+        legendfont = 14,
     )
     density!(post_plt[j], val_mat[:, j], lw = 3, color = 1, lab = "Posterior")
     if j != 5
@@ -243,8 +245,15 @@ for (j, prior) in enumerate(priors)
     end
     
 end
-# plot!(post_plt[10], yaxis = nothing, xaxis = nothing, grid = nothing, ticks = nothing, showaxis = false )
+
+##
+plot!(post_plt[4], xlims = (0,1.5))
+plot!(post_plt[5], xlims = (0,0.025))
+plot!(post_plt[6], xlims = (0,50))
 display(post_plt)
+
+
+##
 savefig(post_plt, "plots/post_plot" * date_str * description_str * ".png")
 
 ##

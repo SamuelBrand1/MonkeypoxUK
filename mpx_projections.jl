@@ -51,7 +51,7 @@ print("cum. vacs = $(sum(wkly_vaccinations))")
 
 ## Load posterior draws and saved trajectiories
 
-date_str = "2022-09-12"
+date_str = "2022-09-26"
 description_str = "no_ngbmsm_chg" #<---- This is the main model
 # description_str = "no_bv_cng" #<---- This is the version of the model with no behavioural change
 # description_str = "one_metapop" #<--- This is the version of the model with no metapopulation structure
@@ -132,12 +132,12 @@ CSV.write("projections/vaccine_rollout.csv", vaccine_projections)
 d1, d2 = size(mpxv_wkly)
 n_samples = 2000
 n_wks_lookahead = 26
-f_rev = findfirst(wks .> Date(2022, 9, 1))
+f_rev = findfirst(wks .== Date(2022, 8, 29))
 f_novac = findfirst(wks .== Date(2022, 7, 25))
 
 wks_proj_fromend = [wks[end] + Day(7k) for k = 1:n_wks_lookahead]
 all_wks = [wks; wks_proj_fromend]
-wks_reversion = [wks[f_rev] + Day(7k) for k = 1:n_lookaheadweeks+3]
+wks_reversion = [wks[f_rev] + Day(7k) for k = 1:n_lookaheadweeks+4]
 wks_no_vacs = [wks[f_novac] + Day(7k) for k = 1:n_lookaheadweeks+9]
 
 # Checks
@@ -185,6 +185,16 @@ proj_no_vaccines = [
     ) for k = 1:n_samples
 ]
 
+proj_uniform_vaccines = [
+    (
+        ts = wks_no_vacs .|> d -> (d - Date(2021, 12, 31)).value |> Float64,
+        wkly_vaccinations = wkly_vaccinations[13:end],
+        vac_effectiveness = vac_effs[k],
+    ) for k = 1:n_samples
+]
+
+
+
 
 projections_from_end = @showprogress 0.1 "MPX Forecasts:" map(
     (θ, interventions, state) ->
@@ -224,6 +234,24 @@ projections_reversions_4wk_rev_no_vac =
         no_vac_states,
     )
 
+projections_reversions_4wk_rev_uniform_vac =
+    @showprogress 0.1 "MPX 4 week reversion (uniform vaccines):" map(
+        (θ, interventions, state) ->
+            mpx_sim_function_projections_uniform_vaccination(θ, constants, interventions, state, 4),
+        param_draws,
+        proj_uniform_vaccines,
+        no_vac_states,
+    )    
+
+projections_reversions_12wk_rev_uniform_vac =
+    @showprogress 0.1 "MPX 12 week reversion (uniform vaccines):" map(
+        (θ, interventions, state) ->
+            mpx_sim_function_projections_uniform_vaccination(θ, constants, interventions, state, 12),
+        param_draws,
+        proj_uniform_vaccines,
+        no_vac_states,
+    )        
+
 projections_reversions_12wk_rev_no_vac =
     @showprogress 0.1 "MPX 12 week reversion (no vaccines):" map(
         (θ, interventions, state) ->
@@ -257,6 +285,17 @@ cred_int_12wk_no_vacs = MonkeypoxUK.cred_intervals(
     [proj.detected_cases for proj in projections_reversions_12wk_rev_no_vac],
     central_est = :median,
 )
+
+cred_int_4wk_uniform_vacs = MonkeypoxUK.cred_intervals(
+    [proj.detected_cases for proj in projections_reversions_4wk_rev_uniform_vac],
+    central_est = :median,
+)
+
+cred_int_12wk_uniform_vacs = MonkeypoxUK.cred_intervals(
+    [proj.detected_cases for proj in projections_reversions_12wk_rev_uniform_vac],
+    central_est = :median,
+)
+
 cred_int_4wk = MonkeypoxUK.cred_intervals(
     [proj.detected_cases for proj in projections_reversions_4wk_rev],
     central_est = :median,
@@ -278,6 +317,11 @@ cum_cred_unmitigated = MonkeypoxUK.cred_intervals(
     central_est = :median,
 )
 
+cum_cred_unmitigated_all_infections = MonkeypoxUK.matrix_cred_intervals(
+    [sum(proj.detected_cases,dims = 2) for proj in projections_no_mitigation] .|> x -> cumsum(x, dims = 1),
+    central_est = :median,
+)
+
 cum_cred_int_12wk_no_vacs = MonkeypoxUK.cred_intervals(
     [proj.detected_cases for proj in projections_reversions_12wk_rev_no_vac] .|> x -> cumsum(x, dims = 1),
     central_est = :median,
@@ -294,7 +338,7 @@ cum_cred_int_4wk_no_vacs = MonkeypoxUK.cred_intervals(
 cum_cred_infs =
     MonkeypoxUK.matrix_cred_intervals(cumsum.(incidences, dims = 1), central_est = :median)
 
-gbmsm_prop_infs = [sum(inc[:,1:10], dims = 2) for inc in incidences]
+gbmsm_total_infs = [sum(inc[:,1:10], dims = 2) for inc in incidences]
 nongbmsm_total_infs = [inc[:,[11]] for inc in incidences]
 cum_cred_total_gbmsm_infs =
     MonkeypoxUK.matrix_cred_intervals(cumsum.(gbmsm_total_infs, dims = 1)./N_msm, central_est = :median)
@@ -305,15 +349,15 @@ cum_cred_total_nongbmsm_infs =
 
 ## Output quantities reported in paper to LaTeX
 median_pred_total_gbmsm = cum_cred_total_gbmsm_infs.median_pred[end] * 100 |> x -> round(x, sigdigits = 3)
-qs_pred_total_gbmsm = (cum_cred_total_gbmsm_infs.lb_pred_025[end] * 100 |> x -> round(x, sigdigits = 3), cum_cred_total_gbmsm_infs.ub_pred_025[end] * 100 |> x -> round(x, sigdigits = 3))
+qs_pred_total_gbmsm = ((cum_cred_total_gbmsm_infs.median_pred[end] - cum_cred_total_gbmsm_infs.lb_pred_025[end]), cum_cred_total_gbmsm_infs.median_pred[end] + cum_cred_total_gbmsm_infs.ub_pred_025[end]) .|> x -> round(x * 100, sigdigits = 3)
 median_pred_total_nongbmsm = cum_cred_total_nongbmsm_infs.median_pred[end] * 100 |> x -> round(x, sigdigits = 3)
-qs_pred_total_nongbmsm = (cum_cred_total_nongbmsm_infs.lb_pred_025[end] * 100 |> x -> round(x, sigdigits = 3), cum_cred_total_nongbmsm_infs.ub_pred_025[end] * 100 |> x -> round(x, sigdigits = 3))
+qs_pred_total_nongbmsm = ((cum_cred_total_nongbmsm_infs.median_pred[end] - cum_cred_total_nongbmsm_infs.lb_pred_025[end]), cum_cred_total_nongbmsm_infs.median_pred[end] + cum_cred_total_nongbmsm_infs.ub_pred_025[end]) .|> x -> round(x * 100, sigdigits = 3)
 
 
 
 case_output = ""
-case_output = case_output * raw"\newcommand{\totalgbmsminf}{" * "$(median_pred_total_gbmsm)" * raw"%" * " ($(qs_pred_total_gbmsm[1]) - $(qs_pred_total_gbmsm[2])}\n"  
-case_output = case_output * raw"\newcommand{\totalnongbmsminf}{" * "$(median_pred_total_nongbmsm)" * raw"%" * " ($(qs_pred_total_nongbmsm[1]) - $(qs_pred_total_nongbmsm[2])}\n"  
+case_output = case_output * raw"\newcommand{\totalgbmsminf}{" * "$(median_pred_total_gbmsm)" * raw"\%" * " ($(qs_pred_total_gbmsm[1]) - $(qs_pred_total_gbmsm[2])}\n"  
+case_output = case_output * raw"\newcommand{\totalnongbmsminf}{" * "$(median_pred_total_nongbmsm)" * raw"\%" * " ($(qs_pred_total_nongbmsm[1]) - $(qs_pred_total_nongbmsm[2])}\n"  
 
 
 ## MSM projections
@@ -369,12 +413,6 @@ plot!(
     lab = "",
 )
 
-# plot!(plt_msm,
-#         wks_proj_fromend,
-#         cred_proj.median_pred[:,1],
-#         ribbon = (cred_proj.lb_pred_025[:, 1], cred_proj.ub_pred_025[:, 1]),
-#         lab = "bev. change")
-
 plot!(
     plt_msm,
     wks_reversion,
@@ -415,7 +453,7 @@ plot!(
     # ribbon = (cred_int_12wk.lb_pred_25[:, 1], cred_int_12wk.ub_pred_25[:, 1]),
     lw = 3,
     color = :blue,
-    ls = :dash,
+    ls = :dot,
     fillalpha = 0.15,
     lab = "12 week reversion (no vaccines)",
 )
@@ -461,7 +499,7 @@ plot!(
     cred_int_4wk_no_vacs.median_pred[:, 1],
     lw = 3,
     color = :red,
-    ls = :dash,
+    ls = :dot,
     fillalpha = 0.15,
     lab = "4 week reversion (no vaccines)",
 )
@@ -472,7 +510,11 @@ scatter!(
     mpxv_wkly[[1, 2, size(wks, 1)], 1],
     lab = "",
     ms = 6,
+    markercolor = :black,
     color = :black,
+    alpha = 1,
+    markerstrokewidth = 0,
+    lw = 4,
     shape = :square,
 )
 
@@ -486,7 +528,11 @@ scatter!(
     ),
     lab = "Data",
     ms = 6,
+    markercolor = :black,
     color = :black,
+    alpha = 1,
+    markerstrokewidth = 0,
+    lw = 4,
 )
 
 
@@ -583,7 +629,7 @@ plot!(
     wks_no_vacs,
     cred_int_12wk_no_vacs.median_pred[:, 2],
     # ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
-    ls = :dash,
+    ls = :dot,
     lw = 3,
     color = :blue,
     fillalpha = 0.2,
@@ -628,7 +674,7 @@ plot!(
     wks_no_vacs,
     cred_int_4wk_no_vacs.median_pred[:, 2],
     # ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
-    ls = :dash,
+    ls = :dot,
     lw = 3,
     color = :red,
     fillalpha = 0.2,
@@ -641,7 +687,11 @@ scatter!(
     mpxv_wkly[[1, 2, size(wks, 1)], 2],
     lab = "",
     ms = 6,
+    markercolor = :black,
     color = :black,
+    alpha = 1,
+    markerstrokewidth = 0,
+    lw = 4,   
     shape = :square,
 )
 scatter!(
@@ -650,7 +700,11 @@ scatter!(
     mpxv_wkly[3:(end-1), 2],
     lab = "Data",
     ms = 6,
+    markercolor = :black,
     color = :black,
+    alpha = 1,
+    markerstrokewidth = 0,
+    lw = 4,
     yerrors = (
         mpxv_wkly[3:(end-1), 2] .- lwr_mpxv_wkly[3:(end-1), 2],
         upr_mpxv_wkly[3:(end-1), 2] .- mpxv_wkly[3:(end-1), 2],
@@ -871,7 +925,7 @@ plot!(
     creds_R0_gbmsm_4wk.median_pred[210:end],
     alpha = 0.75,
     lab = "",
-    ls = :dash,
+    ls = :dot,
     lw = 3,
     c = :red,
 )
@@ -1043,7 +1097,7 @@ plot!(
     creds_R0_ngbmsm_4wk.median_pred[210:end],
     alpha = 0.75,
     lab = "",
-    ls = :dash,
+    ls = :dot,
     lw = 3,
     c = :red,
 )
@@ -1082,6 +1136,35 @@ savefig(plt, "plots/risk_over_time" * string(wks[end]) * description_str * ".png
 
 cum_mpxv_cases = cumsum(mpxv_wkly, dims = 1)
 
+"""
+    function create_report_str(creds, gbmsm::Bool)
+
+Generate a string reporting posterior median and 95%PIs for cumulative cases.        
+"""
+function create_report_str(creds, gbmsm::Bool)
+    idx = gbmsm ? 1 : 2
+    m = cum_mpxv_cases[d1-2, idx] .+ creds.median_pred[end, idx] |> x -> round(x, digits = 0) |> Int64 
+    qs = (cum_mpxv_cases[d1-2, idx] .+ creds.median_pred[end, idx] - creds.lb_pred_025[end,idx], cum_mpxv_cases[d1-2, idx] .+ creds.median_pred[end, idx] + creds.ub_pred_025[end,idx]) .|> x -> round(x, digits = 0) .|> Int64
+    return "$(m) ($(qs[1]) - $(qs[2]) }\n" 
+end
+
+case_output = case_output * raw"\newcommand{\projcumcasesgbmsmfourwks}{" * create_report_str(cum_cred_int_4wk, true)
+case_output = case_output * raw"\newcommand{\projcumcasesgbmsmtwelvewks}{" * create_report_str(cum_cred_int_12wk, true)
+case_output = case_output * raw"\newcommand{\projcumcasesnongbmsmfourwks}{" * create_report_str(cum_cred_int_4wk, false)
+case_output = case_output * raw"\newcommand{\projcumcasesnongbmsmtwelvewks}{" * create_report_str(cum_cred_int_12wk, false)
+
+case_output = case_output * raw"\newcommand{\projcumcasesgbmsmfourwksnovacs}{" * create_report_str(cum_cred_int_4wk_no_vacs, true)
+case_output = case_output * raw"\newcommand{\projcumcasesgbmsmtwelvewksnovacs}{" * create_report_str(cum_cred_int_12wk_no_vacs, true)
+case_output = case_output * raw"\newcommand{\projcumcasesnongbmsmfourwksnovacs}{" * create_report_str(cum_cred_int_4wk_no_vacs, false)
+case_output = case_output * raw"\newcommand{\projcumcasesnongbmsmtwelvewksnovacs}{" * create_report_str(cum_cred_int_12wk_no_vacs, false)
+
+m = cum_cred_unmitigated_all_infections.median_pred[end] |> x -> round(x, digits = 0) |> Int64
+qs = (cum_cred_unmitigated_all_infections.median_pred[end] - cum_cred_unmitigated_all_infections.lb_pred_025[end], cum_cred_unmitigated_all_infections.median_pred[end] + cum_cred_unmitigated_all_infections.ub_pred_025[end]) .|> x -> round(x, digits=0) .|> Int64
+
+case_output = case_output * raw"\newcommand{\unmitigated}{" * "$(m) ($(qs[1]) - $(qs[2]) }\n"
+
+
+##
 plt_cm_msm = plot(;
     ylabel = "Cumulative cases (thousands)",
     title = "UK Monkeypox cumulative case projections (GBMSM)",
@@ -1143,7 +1226,7 @@ plot!(
         cum_cred_int_4wk_no_vacs.ub_pred_25[:, 1],
     ),
     lw = 3,
-    ls = :dash,
+    ls = :dot,
     color = :red,
     fillstyle = :x,
     fillalpha = 0.2,
@@ -1192,7 +1275,7 @@ plot!(
         cum_cred_int_12wk_no_vacs.ub_pred_25[:, 1],
     ),
     lw = 3,
-    ls = :dash,
+    ls = :dot,
     color = :blue,
     fillalpha = 0.2,
     fillstyle = :x,
@@ -1205,7 +1288,7 @@ plot!(
     cum_cred_unmitigated.median_pred[:, 1],
     ribbon = (cum_cred_unmitigated.lb_pred_25[:, 1], cum_cred_unmitigated.ub_pred_25[:, 1]),
     lw = 3,
-    ls = :dash,
+    ls = :dot,
     color = :green,
     fillalpha = 0.2,
     fillstyle = :x,
@@ -1220,6 +1303,8 @@ scatter!(
     lab = "Data",
     ms = 6,
     color = :black,
+    lw = 3,
+    markerstrokewidth = 0,
 )
 
 ##
@@ -1284,7 +1369,7 @@ plot!(
         cum_cred_int_4wk_no_vacs.ub_pred_25[:, 2],
     ),
     lw = 3,
-    ls = :dash,
+    ls = :dot,
     color = :red,
     fillstyle = :x,
     fillalpha = 0.2,
@@ -1333,7 +1418,7 @@ plot!(
         cum_cred_int_12wk_no_vacs.ub_pred_25[:, 2],
     ),
     lw = 3,
-    ls = :dash,
+    ls = :dot,
     color = :blue,
     fillstyle = :x,
     fillalpha = 0.2,
@@ -1346,7 +1431,7 @@ plot!(
     cum_cred_unmitigated.median_pred[:, 2],
     ribbon = (cum_cred_unmitigated.lb_pred_25[:, 2], cum_cred_unmitigated.ub_pred_25[:, 2]),
     lw = 3,
-    ls = :dash,
+    ls = :dot,
     color = :green,
     fillalpha = 0.2,
     fillstyle = :x,
@@ -1360,6 +1445,7 @@ scatter!(
     lab = "Data",
     ms = 6,
     color = :black,
+    markerstrokewidth = 0,
 )
 
 ##
@@ -1379,7 +1465,6 @@ prop_inf = [
 ]
 
 
-case_output = case_output * raw"\newcommand{propinfgbmsm}{"
 
 mnthly_cnts =
     xs ./ 12 .|>
@@ -1464,6 +1549,8 @@ fig1 = plot(
 
 display(fig1)
 savefig(fig1, "plots/main_figure1_" * string(wks[end]) * description_str * ".png")
+savefig(fig1, "plots/main_figure1_" * string(wks[end]) * description_str * ".pdf")
+savefig(fig1, "plots/main_figure1_" * string(wks[end]) * description_str * ".svg")
 
 ## Main figure 2
 
@@ -1483,7 +1570,423 @@ fig2 = plot(
 
 display(fig2)
 savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".png")
+savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".pdf")
 savefig(fig2, "plots/main_figure2_" * string(wks[end]) * description_str * ".svg")
 
 ## Save LaTeX output
 
+open("cases_output.tex", "w") do io
+    write(io, case_output)
+end;
+
+
+## Alternative plot 
+
+
+plt_msm = plot(;
+    ylabel = "Weekly cases",
+    title = "UK Monkeypox Case Projections (GBMSM)",
+    legend = :topright,
+    # ylims = (-5, 700),
+    xticks = (
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
+    ),
+    left_margin = 5mm,
+    size = (800, 600),
+    dpi = 250,
+    tickfont = 13,
+    titlefont = 22,
+    guidefont = 18,
+    legendfont = 11,
+)
+
+plot!(
+    plt_msm,
+    wks[3:size(cred_int.median_pred, 1)+2],
+    cred_int.median_pred[:, 1],
+    ribbon = (cred_int.lb_pred_25[:, 1], cred_int.ub_pred_25[:, 1]),
+    lw = 3,
+    color = :black,
+    fillalpha = 0.15,
+    lab = "Fitted trajectory",
+)
+
+plot!(
+    plt_msm,
+    wks[3:size(cred_int.median_pred, 1)+2],
+    cred_int.median_pred[:, 1],
+    ribbon = (cred_int.lb_pred_10[:, 1], cred_int.ub_pred_10[:, 1]),
+    lw = 0,
+    color = :black,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks[3:size(cred_int.median_pred, 1)+2],
+    cred_int.median_pred[:, 1],
+    ribbon = (cred_int.lb_pred_025[:, 1], cred_int.ub_pred_025[:, 1]),
+    lw = 0,
+    color = :black,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks_reversion,
+    cred_int_12wk.median_pred[:, 1],
+    ribbon = (cred_int_12wk.lb_pred_25[:, 1], cred_int_12wk.ub_pred_25[:, 1]),
+    lw = 3,
+    color = :blue,
+    fillalpha = 0.15,
+    lab = "12 week reversion",
+)
+
+plot!(
+    plt_msm,
+    wks_reversion,
+    cred_int_12wk.median_pred[:, 1],
+    ribbon = (cred_int_12wk.lb_pred_10[:, 1], cred_int_12wk.ub_pred_10[:, 1]),
+    lw = 0,
+    color = :blue,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks_reversion,
+    cred_int_12wk.median_pred[:, 1],
+    ribbon = (cred_int_12wk.lb_pred_025[:, 1], cred_int_12wk.ub_pred_025[:, 1]),
+    lw = 0,
+    color = :blue,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks_no_vacs,
+    cred_int_12wk_no_vacs.median_pred[:, 1],
+    # ribbon = (cred_int_12wk.lb_pred_25[:, 1], cred_int_12wk.ub_pred_25[:, 1]),
+    lw = 1,
+    color = :blue,
+    ls = :dot,
+    fillalpha = 0.15,
+    lab = "12 week reversion (no vaccines)",
+)
+
+plot!(
+    plt_msm,
+    wks_no_vacs,
+    cred_int_12wk_uniform_vacs.median_pred[:, 1],
+    # ribbon = (cred_int_12wk.lb_pred_25[:, 1], cred_int_12wk.ub_pred_25[:, 1]),
+    lw = 3,
+    color = :blue,
+    ls = :dashdot,
+    fillalpha = 0.15,
+    lab = "12 week reversion (uniform vaccines)",
+)
+
+
+
+plot!(
+    plt_msm,
+    wks_reversion,
+    cred_int_4wk.median_pred[:, 1],
+    ribbon = (cred_int_4wk.lb_pred_25[:, 1], cred_int_4wk.ub_pred_25[:, 1]),
+    lw = 3,
+    color = :red,
+    fillalpha = 0.15,
+    lab = "4 week reversion",
+)
+
+plot!(
+    plt_msm,
+    wks_reversion,
+    cred_int_4wk.median_pred[:, 1],
+    ribbon = (cred_int_4wk.lb_pred_10[:, 1], cred_int_4wk.ub_pred_10[:, 1]),
+    lw = 0,
+    color = :red,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks_reversion,
+    cred_int_4wk.median_pred[:, 1],
+    ribbon = (cred_int_4wk.lb_pred_025[:, 1], cred_int_4wk.ub_pred_025[:, 1]),
+    lw = 0,
+    color = :red,
+    fillalpha = 0.15,
+    lab = "",
+)
+
+plot!(
+    plt_msm,
+    wks_no_vacs,
+    cred_int_4wk_no_vacs.median_pred[:, 1],
+    lw = 1,
+    color = :red,
+    ls = :dot,
+    fillalpha = 0.15,
+    lab = "4 week reversion (no vaccines)",
+)
+
+plot!(
+    plt_msm,
+    wks_no_vacs,
+    cred_int_4wk_uniform_vacs.median_pred[:, 1],
+    lw = 3,
+    color = :red,
+    ls = :dashdot,
+    fillalpha = 0.15,
+    lab = "4 week reversion (uniform vaccines)",
+)
+
+scatter!(
+    plt_msm,
+    wks[[1, 2, size(wks, 1)]],
+    mpxv_wkly[[1, 2, size(wks, 1)], 1],
+    lab = "",
+    ms = 6,
+    color = :black,
+    shape = :square,
+    lw = 4,
+    markerstrokewidth = 0
+)
+
+scatter!(
+    plt_msm,
+    wks[3:(end-1)],
+    mpxv_wkly[3:(end-1), 1],
+    yerrors = (
+        mpxv_wkly[3:(end-1), 1] .- lwr_mpxv_wkly[3:(end-1), 1],
+        upr_mpxv_wkly[3:(end-1), 1] .- mpxv_wkly[3:(end-1), 1],
+    ),
+    lab = "Data",
+    ms = 6,
+    color = :black,
+    lw = 4,
+    markerstrokewidth = 0
+)
+
+
+display(plt_msm)
+
+##
+
+
+plt_nmsm = plot(;
+    ylabel = "Weekly cases",
+    title = "UK Monkeypox Case Projections (non-GBMSM)",
+    legend = :topright,
+    ylims = (-1, 100),
+    xticks = (
+        [Date(2022, 5, 1) + Month(k) for k = 0:11],
+        [monthname(Date(2022, 5, 1) + Month(k))[1:3] for k = 0:11],
+    ),
+    left_margin = 5mm,
+    size = (800, 600),
+    dpi = 250,
+    tickfont = 13,
+    titlefont = 20,
+    guidefont = 18,
+    legendfont = 11,
+)
+
+plot!(
+    plt_nmsm,
+    wks[3:size(cred_int.median_pred, 1)+2],
+    cred_int.median_pred[:, 2],
+    ribbon = (cred_int.lb_pred_25[:, 2], cred_int.ub_pred_25[:, 2]),
+    lw = 3,
+    color = :black,
+    fillalpha = 0.2,
+    lab = "Fitted trajectory",
+)
+
+plot!(
+    plt_nmsm,
+    wks[3:size(cred_int.median_pred, 1)+2],
+    cred_int.median_pred[:, 2],
+    ribbon = (cred_int.lb_pred_10[:, 2], cred_int.ub_pred_10[:, 2]),
+    lw = 0,
+    color = :black,
+    fillalpha = 0.2,
+    lab = "",
+)
+
+plot!(
+    plt_nmsm,
+    wks[3:size(cred_int.median_pred, 1)+2],
+    cred_int.median_pred[:, 2],
+    ribbon = (cred_int.lb_pred_025[:, 2], cred_int.ub_pred_025[:, 2]),
+    lw = 0,
+    color = :black,
+    fillalpha = 0.2,
+    lab = "",
+)
+
+plot!(
+    plt_nmsm,
+    wks_reversion,
+    cred_int_12wk.median_pred[:, 2],
+    ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
+    lw = 3,
+    color = :blue,
+    fillalpha = 0.2,
+    lab = "12 week reversion",
+)
+
+plot!(
+    plt_nmsm,
+    wks_reversion,
+    cred_int_12wk.median_pred[:, 2],
+    ribbon = (cred_int_12wk.lb_pred_10[:, 2], cred_int_12wk.ub_pred_10[:, 2]),
+    lw = 0,
+    color = :blue,
+    fillalpha = 0.2,
+    lab = "",
+)
+
+plot!(
+    plt_nmsm,
+    wks_reversion,
+    cred_int_12wk.median_pred[:, 2],
+    ribbon = (cred_int_12wk.lb_pred_025[:, 2], cred_int_12wk.ub_pred_025[:, 2]),
+    lw = 0,
+    color = :blue,
+    fillalpha = 0.2,
+    lab = "",
+)
+
+plot!(
+    plt_nmsm,
+    wks_no_vacs,
+    cred_int_12wk_no_vacs.median_pred[:, 2],
+    # ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
+    ls = :dot,
+    lw = 1,
+    color = :blue,
+    fillalpha = 0.2,
+    lab = "12 week reversion (no vaccines)",
+)
+
+plot!(
+    plt_nmsm,
+    wks_no_vacs,
+    cred_int_12wk_uniform_vacs.median_pred[:, 2],
+    # ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
+    ls = :dashdot,
+    lw = 3,
+    color = :blue,
+    fillalpha = 0.2,
+    lab = "12 week reversion (uniform vaccines)",
+)
+
+plot!(
+    plt_nmsm,
+    wks_reversion,
+    cred_int_4wk.median_pred[:, 2],
+    ribbon = (cred_int_4wk.lb_pred_25[:, 2], cred_int_4wk.ub_pred_25[:, 2]),
+    lw = 3,
+    color = :red,
+    fillalpha = 0.2,
+    lab = "4 week reversion",
+)
+
+plot!(
+    plt_nmsm,
+    wks_reversion,
+    cred_int_4wk.median_pred[:, 2],
+    ribbon = (cred_int_4wk.lb_pred_10[:, 2], cred_int_4wk.ub_pred_10[:, 2]),
+    lw = 0,
+    color = :red,
+    fillalpha = 0.2,
+    lab = "",
+)
+
+plot!(
+    plt_nmsm,
+    wks_reversion,
+    cred_int_4wk.median_pred[:, 2],
+    ribbon = (cred_int_4wk.lb_pred_025[:, 2], cred_int_4wk.ub_pred_025[:, 2]),
+    lw = 0,
+    color = :red,
+    fillalpha = 0.2,
+    lab = "",
+)
+
+plot!(
+    plt_nmsm,
+    wks_no_vacs,
+    cred_int_4wk_no_vacs.median_pred[:, 2],
+    # ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
+    ls = :dot,
+    lw = 1,
+    color = :red,
+    fillalpha = 0.2,
+    lab = "4 week reversion (no vaccines)",
+)
+
+plot!(
+    plt_nmsm,
+    wks_no_vacs,
+    cred_int_4wk_uniform_vacs.median_pred[:, 2],
+    # ribbon = (cred_int_12wk.lb_pred_25[:, 2], cred_int_12wk.ub_pred_25[:, 2]),
+    ls = :dot,
+    lw = 3,
+    color = :red,
+    fillalpha = 0.2,
+    lab = "4 week reversion (uniform vaccines)",
+)
+
+scatter!(
+    plt_nmsm,
+    wks[[1, 2, size(wks, 1)]],
+    mpxv_wkly[[1, 2, size(wks, 1)], 2],
+    lab = "",
+    ms = 6,
+    color = :black,
+    shape = :square,
+    lw = 4,
+    markerstrokewidth = 0,
+)
+scatter!(
+    plt_nmsm,
+    wks[3:(end-1)],
+    mpxv_wkly[3:(end-1), 2],
+    lab = "Data",
+    ms = 6,
+    color = :black,
+    lw = 4,
+    markerstrokewidth = 0,
+    yerrors = (
+        mpxv_wkly[3:(end-1), 2] .- lwr_mpxv_wkly[3:(end-1), 2],
+        upr_mpxv_wkly[3:(end-1), 2] .- mpxv_wkly[3:(end-1), 2],
+    ),
+)
+
+display(plt_nmsm)
+
+##
+
+plt_uniform_vac = plot(plt_msm, plt_nmsm,
+    size = (1750, 800),
+    dpi = 250,
+    left_margin = 10mm,
+    bottom_margin = 10mm,
+    right_margin = 10mm,
+    top_margin = 5mm,
+    layout = (1,2),
+    )
+
+display(plt_uniform_vac)
+savefig("plots/uniform_vaccination.png")    
+savefig("plots/uniform_vaccination.pdf")    
+savefig("plots/uniform_vaccination.svg")    
