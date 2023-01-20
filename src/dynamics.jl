@@ -779,7 +779,7 @@ function mpx_sim_function_projections(params, constants, interventions, init_con
     wk_num = 1
     detected_cases = zeros(weeks_to_project, 2)
     incidence = zeros(Int64, weeks_to_project, 11)
-
+    susceptibility = zeros(weeks_to_project, length(ps) + 1)
 
     # #Step through the dynamics
     while wk_num <= weeks_to_project #Step forward a week
@@ -838,13 +838,20 @@ function mpx_sim_function_projections(params, constants, interventions, init_con
         incidence[wk_num, :] .=
             old_sus .- new_sus .- [0; 0; sum(num_vaccines, dims = 2)[:]; 0] #Total infections = reduction in susceptibles - number vaccinated
 
+        susceptibility[wk_num, :] .=
+            (
+                new_sus .+
+                (1 - vac_effectiveness) .*
+                [sum(mpx_init.u.x[1][6, :, :][:, :], dims = 2)[:]; 0]
+            ) ./ [N_msm .* ps; N_total - N_msm]
+
         #Move time forwards one week
         wk_num += 1
         old_onsets = new_onsets
         old_sus = new_sus
     end
 
-    return (; detected_cases, incidence)
+    return (; detected_cases, incidence, susceptibility)
 end
 
 """
@@ -1088,6 +1095,7 @@ function mpx_sim_function_projections(
     wk_num = 1
     detected_cases = zeros(weeks_to_project, 2)
     incidence = zeros(Int64, weeks_to_project, 11)
+    susceptibility = zeros(weeks_to_project, length(ps) + 1)
 
 
     # #Step through the dynamics
@@ -1153,6 +1161,12 @@ function mpx_sim_function_projections(
         detected_cases[wk_num, :] .= Float64.(actual_obs)
         incidence[wk_num, :] .=
             old_sus .- new_sus .- [0; 0; sum(num_vaccines, dims = 2)[:]; 0] #Total infections = reduction in susceptibles - number vaccinated
+        susceptibility[wk_num, :] .=
+            (
+                new_sus .+
+                (1 - vac_effectiveness) .*
+                [sum(mpx_init.u.x[1][6, :, :][:, :], dims = 2)[:]; 0]
+            ) ./ [N_msm .* ps; N_total - N_msm]
 
         #Move time forwards one week
         wk_num += 1
@@ -1160,7 +1174,7 @@ function mpx_sim_function_projections(
         old_sus = new_sus
     end
 
-    return (; detected_cases, incidence)
+    return (; detected_cases, incidence, susceptibility)
 end
 
 """

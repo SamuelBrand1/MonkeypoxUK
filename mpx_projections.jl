@@ -72,6 +72,8 @@ end_states =
     load("posteriors/posterior_end_states_" * date_str * description_str * ".jld2")["end_states"]
 incidences =
     load("posteriors/posterior_incidences_" * date_str * description_str * ".jld2")["incidences"]
+sus_mats = 
+    load("posteriors/posterior_susceptibilities_" * date_str * description_str * ".jld2")["susceptibilities"]
 
 param_draws_no_bv_cng = map(θ -> vcat(θ[1:(end-4)], zeros(4)), deepcopy(param_draws))
 
@@ -717,11 +719,7 @@ display(plt_nmsm)
 
 long_wks_reversion = [wks[1:(end-3)]; wks_reversion]
 ts_reversion =
-    (long_wks_reversion[1]-Date(2021, 12, 31)).value:1.0:(long_wks_reversion[end]-Date(
-        2021,
-        12,
-        31,
-    )).value
+    (long_wks_reversion[1]-Date(2021, 12, 31)).value:1.0:(long_wks_reversion[end]-Date(2021,12,31)).value
 
 transmission_risks_with_vaccines_no_rev =
     map(θ -> reproductive_ratios(θ, constants, ts_reversion), param_draws)
@@ -737,6 +735,7 @@ creds_R0_gbmsm_no_rev = matrix_cred_intervals(
     ],
     central_est = :median,
 )
+
 creds_R0_ngbmsm_no_rev = matrix_cred_intervals(
     [
         reshape(R.R₀_ngbmsm, length(R.R₀_gbmsm), 1) for
@@ -773,6 +772,39 @@ creds_R0_ngbmsm_4wk = matrix_cred_intervals(
     central_est = :median,
 )
 
+# Susceptibility matrices are saved weekly so need to compare correctly with the daily R0 estimates
+R_idxs = findall([Date(2021,12,31) + Day(Int64(t)) ∈ wks[1:end] for t in ts_reversion])
+
+eff_susceptibles = [[1.0; 1.0; mat[:, 1:10] * (mean_daily_cnts ./ (10 * mean(mean_daily_cnts)))] for mat in sus_mats]
+eff_sus_12wk
+
+n_days_fit = size(eff_susceptibles[1], 1)
+
+creds_effR0_gbmsm_no_rev = matrix_cred_intervals(
+    [
+        reshape(R.R₀_gbmsm[R_idxs] .* eff_susceptibles[i] , n_days_fit, 1) for
+        (i, R) in enumerate(transmission_risks_with_vaccines_no_rev)
+    ],
+    central_est = :median,
+)
+
+creds_effR0_gbmsm_12wk = matrix_cred_intervals(
+    [
+        reshape(R.R₀_gbmsm[R_idxs] .* eff_susceptibles[i] , n_days_fit, 1) for
+        (i, R) in enumerate(transmission_risks_with_vaccines_12wk_rev)
+    ],
+    central_est = :median,
+)
+
+creds_effR0_gbmsm_4wk = matrix_cred_intervals(
+    [
+        reshape(R.R₀_gbmsm[R_idxs] .* eff_susceptibles[i] , n_days_fit, 1) for
+        (i, R) in enumerate(transmission_risks_with_vaccines_4wk_rev)
+    ],
+    central_est = :median,
+)
+
+
 ##
 
 dates = [Date(2021, 12, 31) + Day(t) for t in ts_reversion]
@@ -792,7 +824,7 @@ plt_R_gbmsm = plot(
     ),
     lw = 3,
     fillalpha = 0.2,
-    lab = "Fitted",
+    lab = "Fitted R₀",
     title = "Reproductive number (GBMSM)",
     ylabel = "R₀(t) (GBMSM)",
     xlims = (long_wks[1] - Day(7), long_wks[end] + Day(7)),
@@ -839,6 +871,17 @@ plot!(
     lw = 0,
     c = :black,
 )
+
+plot!(
+    plt_R_gbmsm,
+    wks[1:(end-1)],
+    creds_effR0_gbmsm_no_rev.median_pred[1:(end-1)],
+    ls = :dash,
+    lab = "Fitted eff. R₀",
+    lw = 3,
+    c = :black,
+)
+
 
 plot!(
     plt_R_gbmsm,
