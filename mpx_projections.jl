@@ -195,9 +195,6 @@ proj_uniform_vaccines = [
     ) for k = 1:n_samples
 ]
 
-
-
-
 projections_from_end = @showprogress 0.1 "MPX Forecasts:" map(
     (θ, interventions, state) ->
         mpx_sim_function_projections(θ, constants, interventions, state),
@@ -350,6 +347,7 @@ cum_cred_total_nongbmsm_infs =
         
 
 ## Output quantities reported in paper to LaTeX
+
 median_pred_total_gbmsm = cum_cred_total_gbmsm_infs.median_pred[end] * 100 |> x -> round(x, sigdigits = 3)
 qs_pred_total_gbmsm = ((cum_cred_total_gbmsm_infs.median_pred[end] - cum_cred_total_gbmsm_infs.lb_pred_025[end]), cum_cred_total_gbmsm_infs.median_pred[end] + cum_cred_total_gbmsm_infs.ub_pred_025[end]) .|> x -> round(x * 100, sigdigits = 3)
 median_pred_total_nongbmsm = cum_cred_total_nongbmsm_infs.median_pred[end] * 100 |> x -> round(x, sigdigits = 3)
@@ -358,8 +356,8 @@ qs_pred_total_nongbmsm = ((cum_cred_total_nongbmsm_infs.median_pred[end] - cum_c
 
 
 case_output = ""
-case_output = case_output * raw"\newcommand{\totalgbmsminf}{" * "$(median_pred_total_gbmsm)" * raw"\%" * " ($(qs_pred_total_gbmsm[1]) - $(qs_pred_total_gbmsm[2])}\n"  
-case_output = case_output * raw"\newcommand{\totalnongbmsminf}{" * "$(median_pred_total_nongbmsm)" * raw"\%" * " ($(qs_pred_total_nongbmsm[1]) - $(qs_pred_total_nongbmsm[2])}\n"  
+case_output = case_output * raw"\newcommand{\totalgbmsminf}{" * "$(median_pred_total_gbmsm)" * raw"\%" * " ($(qs_pred_total_gbmsm[1]) -- $(qs_pred_total_gbmsm[2])}\n"  
+case_output = case_output * raw"\newcommand{\totalnongbmsminf}{" * "$(median_pred_total_nongbmsm)" * raw"\%" * " ($(qs_pred_total_nongbmsm[1]) -- $(qs_pred_total_nongbmsm[2])}\n"  
 
 
 ## MSM projections
@@ -774,11 +772,14 @@ creds_R0_ngbmsm_4wk = matrix_cred_intervals(
 
 # Susceptibility matrices are saved weekly so need to compare correctly with the daily R0 estimates
 R_idxs = findall([Date(2021,12,31) + Day(Int64(t)) ∈ wks[1:end] for t in ts_reversion])
-
 eff_susceptibles = [[1.0; 1.0; mat[:, 1:10] * (mean_daily_cnts ./ (10 * mean(mean_daily_cnts)))] for mat in sus_mats]
-eff_sus_12wk
-
 n_days_fit = size(eff_susceptibles[1], 1)
+creds_eff_susceptibles = matrix_cred_intervals(eff_susceptibles .|> x -> reshape(1 .- x, size(x, 1), 1),central_est = :median)
+
+m = creds_eff_susceptibles.median_pred[end-3] * 100 |> x -> round(x, sigdigits = 3)
+qs = (creds_eff_susceptibles.median_pred[end-3] - creds_eff_susceptibles.lb_pred_025[end-3], creds_eff_susceptibles.median_pred[end-3] + creds_eff_susceptibles.ub_pred_025[end-3]) .|> x -> x * 100 .|> x -> round(x, sigdigits = 3)
+
+case_output = case_output * raw"\newcommand{\dropinReff}{" * "$(m)\\% ($(qs[1]) -- $(qs[2])\\% }\n"
 
 creds_effR0_gbmsm_no_rev = matrix_cred_intervals(
     [
@@ -1188,7 +1189,7 @@ function create_report_str(creds, gbmsm::Bool)
     idx = gbmsm ? 1 : 2
     m = cum_mpxv_cases[d1-2, idx] .+ creds.median_pred[end, idx] |> x -> round(x, digits = 0) |> Int64 
     qs = (cum_mpxv_cases[d1-2, idx] .+ creds.median_pred[end, idx] - creds.lb_pred_025[end,idx], cum_mpxv_cases[d1-2, idx] .+ creds.median_pred[end, idx] + creds.ub_pred_025[end,idx]) .|> x -> round(x, digits = 0) .|> Int64
-    return "$(m) ($(qs[1]) - $(qs[2]) }\n" 
+    return "$(m) ($(qs[1]) -- $(qs[2]) }\n" 
 end
 
 case_output = case_output * raw"\newcommand{\projcumcasesgbmsmfourwks}{" * create_report_str(cum_cred_int_4wk, true)
@@ -1204,7 +1205,7 @@ case_output = case_output * raw"\newcommand{\projcumcasesnongbmsmtwelvewksnovacs
 m = cum_cred_unmitigated_all_infections.median_pred[end] |> x -> round(x, digits = 0) |> Int64
 qs = (cum_cred_unmitigated_all_infections.median_pred[end] - cum_cred_unmitigated_all_infections.lb_pred_025[end], cum_cred_unmitigated_all_infections.median_pred[end] + cum_cred_unmitigated_all_infections.ub_pred_025[end]) .|> x -> round(x, digits=0) .|> Int64
 
-case_output = case_output * raw"\newcommand{\unmitigated}{" * "$(m) ($(qs[1]) - $(qs[2]) }\n"
+case_output = case_output * raw"\newcommand{\unmitigated}{" * "$(m) ($(qs[1]) -- $(qs[2]) }\n"
 
 
 ##

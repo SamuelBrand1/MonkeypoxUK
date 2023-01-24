@@ -199,9 +199,9 @@ end
 
 output = ""
 output = output * raw"\newcommand{\Rotherfit}{"
-output = output * "$(R0_other_mean) ($(R0_other_q[1]) - $(R0_other_q[2])}\n"
+output = output * "$(R0_other_mean) ($(R0_other_q[1]) -- $(R0_other_q[2])}\n"
 output = output * raw"\newcommand{\probtransmissionfit}{"
-output = output * LaTeXString("$(prob_trans_mean)\\% ($(prob_trans_q[1]) - $(prob_trans_q[2])\\%}\n")
+output = output * LaTeXString("$(prob_trans_mean)\\% ($(prob_trans_q[1]) -- $(prob_trans_q[2])\\%}\n")
 
 
 ## Posterior distribution table
@@ -275,10 +275,10 @@ qs_R_gbmsm_red2 = quantile(R_gbmsms_red2, [0.025, 0.975]) .|> x -> round(x, sigd
 mean_red_1 = mean(red1) |> x -> round(x, sigdigits = 3) * 100
 qs_red_1 = quantile(red1, [0.025, 0.975]) .|> x -> round(x, sigdigits = 3) * 100
 
-output = output * raw"\newcommand{\gbmsmR}{" * "$(mean_R_gbmsm) ($(qs_R_gbmsm[1]) - $(qs_R_gbmsm[2])}\n"
+output = output * raw"\newcommand{\gbmsmR}{" * "$(mean_R_gbmsm) ($(qs_R_gbmsm[1]) -- $(qs_R_gbmsm[2])}\n"
 output = output * raw"\newcommand{\efftransmissionperiod}{" * "$(round(eff_infectious_period, sigdigits = 3))}\n"
-output = output * raw"\newcommand{\gbmsmRredbv}{" * "$(mean_R_gbmsm_red1) ($(qs_R_gbmsm_red1[1]) - $(qs_R_gbmsm_red1[2])}\n"
-output = output * raw"\newcommand{\gbmsmRredwho}{" * "$(mean_R_gbmsm_red2) ($(qs_R_gbmsm_red2[1]) - $(qs_R_gbmsm_red2[2])}\n"
+output = output * raw"\newcommand{\gbmsmRredbv}{" * "$(mean_R_gbmsm_red1) ($(qs_R_gbmsm_red1[1]) -- $(qs_R_gbmsm_red1[2])}\n"
+output = output * raw"\newcommand{\gbmsmRredwho}{" * "$(mean_R_gbmsm_red2) ($(qs_R_gbmsm_red2[1]) -- $(qs_R_gbmsm_red2[2])}\n"
 output = output * raw"\newcommand{\reductionone}{" * string(mean_red_1) * raw"\%}\n"
 
 ##Calculate orignal R₀ and latest R(t)
@@ -359,7 +359,7 @@ R0s = map(
 
 m = mean(R0s) |> x -> round(x, sigdigits = 3)
 qs = quantile(R0s, [0.025, 0.975]) .|> x -> round(x, sigdigits = 3)
-output = output * raw"\newcommand{\totalR}{" * "$(m) ($(qs[1]) - $(qs[2])}\n"
+output = output * raw"\newcommand{\totalR}{" * "$(m) ($(qs[1]) -- $(qs[2])}\n"
 
 ##
 
