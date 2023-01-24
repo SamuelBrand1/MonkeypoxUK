@@ -252,7 +252,7 @@ function mpx_sim_function_chp(params, constants, wkly_cases)
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1:3, 3:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
@@ -433,7 +433,7 @@ function mpx_sim_function_chp_uniform_vac(params, constants, wkly_cases)
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num] #Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 1:end, :] / (sum(du_vac.x[1][1, 1:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 1:end, :] / (sum(du_vac.x[1][1:3, 1:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
@@ -633,7 +633,7 @@ function mpx_sim_function_mdl_selection(params, constants, wkly_cases)
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1:3, 3:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
@@ -805,7 +805,7 @@ function mpx_sim_function_projections(params, constants, interventions, init_con
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1:3, 3:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
@@ -960,7 +960,7 @@ function mpx_sim_function_projections_uniform_vaccination(params, constants, int
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 1:end, :] / (sum(du_vac.x[1][1, 1:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 1:end, :] / (sum(du_vac.x[1][1:3, 1:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
@@ -1129,7 +1129,7 @@ function mpx_sim_function_projections(
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1, 3:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 3:end, :] / (sum(du_vac.x[1][1:3, 3:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
@@ -1302,7 +1302,7 @@ function mpx_sim_function_projections_uniform_vaccination(
         #Do vaccine uptake
         nv = wkly_vaccinations[wk_num]#Mean number of vaccines deployed
         du_vac = deepcopy(mpx_init.u)
-        vac_rate = nv .* du_vac.x[1][1, 1:end, :] / (sum(du_vac.x[1][1, 1:end, :]) .+ 1e-5)
+        vac_rate = nv .* du_vac.x[1][1, 1:end, :] / (sum(du_vac.x[1][1:3, 1:end, :]) .+ 1e-5)
         num_vaccines = map(
             (μ, maxval) -> min(rand(Poisson(μ)), maxval),
             vac_rate,
